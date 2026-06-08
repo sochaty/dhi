@@ -1,36 +1,99 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
 
-# testing
-/coverage
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
 
-# next.js
-/.next/
-/out/
+# Test & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
 
-# production
-/build
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
 
-# misc
-.DS_Store
-*.pem
+# Linter caches
+.ruff_cache/
 
-# debug
+# Jupyter
+.ipynb_checkpoints/
+
+# ── Node / TypeScript (extension) ─────────────────────────────────────────────
+node_modules/
+extension/out/
+extension/coverage/
+*.vsix
+*.tsbuildinfo
+
+# ── Environment & secrets ──────────────────────────────────────────────────────
+# .env.example is committed — actual .env files are not
+.env
+.env.*
+!.env.example
+
+# ── Docker / local data volumes ────────────────────────────────────────────────
+# Chroma persists its index here when CHROMA_DATA_PATH is set to a local dir
+chroma_data/
+# Ollama model weights (large binary blobs)
+ollama_models/
+# Docker override for local tweaks
+docker-compose.override.yml
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
+# ── OS artefacts ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# vercel
-.vercel
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+# VS Code workspace settings that are machine-specific
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# ── Security ──────────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.bak
+*.swp
+*.swo
+*~

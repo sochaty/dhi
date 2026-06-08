@@ -1,0 +1,39 @@
+# Don't copy these into the Docker image — they're for local dev only
+
+# Virtual environment (large, wrong platform)
+.venv/
+venv/
+env/
+
+# Test suite and coverage — not needed at runtime
+tests/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Dev dependencies file (only requirements.txt is needed)
+requirements-dev.txt
+
+# Local env overrides
+.env
+.env.*
+
+# Editor artefacts
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS artefacts
+.DS_Store
+Thumbs.db

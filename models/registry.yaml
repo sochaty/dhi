@@ -1,0 +1,63 @@
+# Dhi model registry
+# Maps task → recommended model per hardware tier.
+#
+# Columns:
+#   ollama_name  — used for docker-compose CPU dev stack
+#   vllm_name    — used for prod GPU inference (vLLM)
+#   vram_gb      — minimum VRAM required
+#   context_len  — context window (tokens)
+#   fim_tokens   — max tokens per FIM completion
+
+fim:
+  default:
+    ollama_name: "starcoder2:3b"
+    vllm_name: "bigcode/starcoder2-3b"
+    vram_gb: 6
+    context_len: 16384
+    fim_tokens: 64
+    note: "Best balance of speed and quality for 8–16 GB VRAM"
+
+  fast:
+    ollama_name: "starcoder2:1b"
+    vllm_name: "bigcode/starcoder2-1b"
+    vram_gb: 3
+    context_len: 16384
+    fim_tokens: 64
+    note: "Fastest; CPU-friendly for machines without a discrete GPU"
+
+  quality:
+    ollama_name: "deepseek-coder-v2:16b"
+    vllm_name: "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct"
+    vram_gb: 12
+    context_len: 131072
+    fim_tokens: 128
+    note: "Best quality; requires 16+ GB VRAM"
+
+  max:
+    ollama_name: "qwen2.5-coder:32b"
+    vllm_name: "Qwen/Qwen2.5-Coder-32B-Instruct"
+    vram_gb: 24
+    context_len: 131072
+    fim_tokens: 256
+    note: "Competitive with GPT-4o on HumanEval; for A100/H100"
+
+chat:
+  default:
+    ollama_name: "qwen2.5-coder:7b"
+    vllm_name: "Qwen/Qwen2.5-Coder-7B-Instruct"
+    vram_gb: 6
+    context_len: 131072
+    note: "Strong instruction-following for code Q&A"
+
+  quality:
+    ollama_name: "deepseek-coder-v2:16b"
+    vllm_name: "deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct"
+    vram_gb: 12
+    context_len: 131072
+    note: "Best open-source chat model for multi-file reasoning"
+
+embeddings:
+  default:
+    ollama_name: "nomic-embed-text"
+    dimensions: 768
+    note: "Outperforms ada-002 on code retrieval benchmarks (MTEB)"

@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "dhi-server"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+# ── Ruff (linter + formatter) ─────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["server"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "TID", # flake8-tidy-imports
+]
+ignore = [
+    "E501",  # line too long — handled by formatter
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# Enforce architecture layer boundaries (see ARCHITECTURE.md):
+# Only rag/store.py may import chromadb — no other module.
+"chromadb" = { msg = "Import chromadb only in rag/store.py (Architecture rule #1)" }
+
+# ── mypy ──────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["server/tests/"]
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["server/tests"]
+addopts = "-v -m 'not integration'"
+markers = [
+    "integration: tests that require running Docker services (Chroma, Ollama)",
+]
+pythonpath = ["server"]

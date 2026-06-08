@@ -1,0 +1,79 @@
+{
+  "name": "dhi",
+  "displayName": "Dhi — Open Source AI IDE",
+  "description": "FIM autocomplete, chat, and multi-file agent powered by open-source models.",
+  "version": "0.1.0",
+  "publisher": "sochaty",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sochaty/dhi"
+  },
+  "categories": ["AI", "Programming Languages", "Other"],
+  "keywords": ["AI", "autocomplete", "open source", "LLM", "StarCoder", "Qwen"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "dhi.openChat",
+        "title": "Dhi: Open Chat"
+      },
+      {
+        "command": "dhi.indexWorkspace",
+        "title": "Dhi: Index Workspace"
+      }
+    ],
+    "configuration": {
+      "title": "Dhi",
+      "properties": {
+        "dhi.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the Dhi FastAPI server."
+        },
+        "dhi.completionDebounceMs": {
+          "type": "number",
+          "default": 150,
+          "description": "Debounce delay in milliseconds before requesting a completion."
+        },
+        "dhi.completionEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline FIM completions."
+        },
+        "dhi.maxCompletionTokens": {
+          "type": "number",
+          "default": 64,
+          "description": "Maximum number of tokens per completion."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "mocha --require ts-node/register 'src/**/*.test.ts'",
+    "pretest": "npm run compile",
+    "package": "vsce package"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.12.5",
+    "@types/sinon": "^17.0.3",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^7.6.0",
+    "@typescript-eslint/parser": "^7.6.0",
+    "eslint": "^8.57.0",
+    "mocha": "^10.4.0",
+    "sinon": "^17.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "@vscode/vsce": "^2.26.0"
+  }
+}
