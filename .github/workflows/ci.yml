@@ -187,6 +187,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
 
       - name: Build server image
         uses: docker/build-push-action@v5
@@ -196,8 +198,6 @@ jobs:
           push: false
           tags: dhi-server:ci
           load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master
