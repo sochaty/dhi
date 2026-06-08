@@ -1,7 +1,7 @@
 import hashlib
 import os
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Any, Protocol
 
 import httpx
 
@@ -55,8 +55,11 @@ class ChunkStore:
             return
         ids = [chunk_id(c) for c in chunks]
         texts = [c.text for c in chunks]
-        embeddings = _embed(texts)
-        metadatas = [
+        # list[list[float]] is valid at runtime; cast to Any to satisfy the
+        # chromadb stub which expects ndarray | list[Sequence[...]] | None.
+        embeddings: list[Any] = _embed(texts)
+        # Explicit value type keeps mypy happy with chromadb's Mapping union.
+        metadatas: list[dict[str, str | int]] = [
             {
                 "file_path": c.file_path,
                 "start_line": c.start_line,
@@ -86,13 +89,14 @@ class ChunkStore:
         count = self._col.count()
         if count == 0:
             return []
-        embeddings = _embed([text])
+        embeddings: list[Any] = _embed([text])
         results = self._col.query(
             query_embeddings=embeddings,
             n_results=min(n_results, count),
             include=["documents"],
         )
-        return results["documents"][0]
+        docs = results["documents"]
+        return docs[0] if docs is not None else []
 
     def count(self) -> int:
         return self._col.count()
