@@ -58,8 +58,8 @@ class ChunkStore:
         # list[list[float]] is valid at runtime; cast to Any to satisfy the
         # chromadb stub which expects ndarray | list[Sequence[...]] | None.
         embeddings: list[Any] = _embed(texts)
-        # Explicit value type keeps mypy happy with chromadb's Mapping union.
-        metadatas: list[dict[str, str | int]] = [
+        # list is invariant; list[Any] satisfies chromadb's list[Mapping[...]] stub.
+        metadatas: list[Any] = [
             {
                 "file_path": c.file_path,
                 "start_line": c.start_line,
