@@ -57,7 +57,7 @@
     "compile": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
     "lint": "eslint src --ext .ts",
-    "test": "mocha --require ts-node/register 'src/**/*.test.ts'",
+    "test": "mocha --require ./test/vscode-stub.cjs --require ts-node/register 'src/**/*.test.ts'",
     "pretest": "npm run compile",
     "package": "vsce package"
   },

@@ -4,9 +4,11 @@
  * Architecture rule (see ARCHITECTURE.md):
  *   Providers and panels MUST NOT call fetch() directly.
  *   All HTTP goes through this class.
+ *
+ * DhiClient has no VS Code dependency — it is a plain HTTP client. The caller
+ * (extension.ts) is responsible for reading the serverUrl from VS Code config
+ * and passing it as a getter so the value is always fresh.
  */
-
-import * as vscode from 'vscode';
 
 export interface CompleteRequest {
   file_path: string;
@@ -32,10 +34,12 @@ export interface HealthResponse {
 }
 
 export class DhiClient {
+  constructor(
+    private readonly getServerUrl: () => string = () => 'http://localhost:8000',
+  ) {}
+
   private get baseUrl(): string {
-    return vscode.workspace
-      .getConfiguration('dhi')
-      .get<string>('serverUrl', 'http://localhost:8000');
+    return this.getServerUrl();
   }
 
   async health(): Promise<HealthResponse> {

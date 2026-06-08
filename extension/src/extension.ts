@@ -16,7 +16,9 @@ import { ChatPanel } from './chat/panel';
 let statusBar: vscode.StatusBarItem;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const client = new DhiClient();
+  const client = new DhiClient(() =>
+    vscode.workspace.getConfiguration('dhi').get<string>('serverUrl', 'http://localhost:8000'),
+  );
 
   // ── Status bar ────────────────────────────────────────────────────────────
   statusBar = vscode.window.createStatusBarItem(
