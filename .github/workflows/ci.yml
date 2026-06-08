@@ -116,11 +116,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: extension/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: ESLint
         run: npm run lint
@@ -142,11 +140,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: extension/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Mocha tests
         run: npm test
@@ -165,11 +161,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
-          cache-dependency-path: extension/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # --audit-level=high: fail only on high/critical CVEs, ignore low/moderate
       # devDependencies rarely end up in the shipped .vsix

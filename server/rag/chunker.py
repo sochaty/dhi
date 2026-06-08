@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from collections.abc import Generator
 
 import tree_sitter_python as tspython
 import tree_sitter_typescript as tstypescript

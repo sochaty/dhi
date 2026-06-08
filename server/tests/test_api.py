@@ -12,9 +12,7 @@ Endpoints tested:
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-# api_client, fake_store, fake_store_with_results are auto-imported from conftest.py
+# api_client, fake_store are injected by pytest from conftest.py
 
 
 # ── GET /health ────────────────────────────────────────────────────────────────

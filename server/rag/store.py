@@ -1,12 +1,9 @@
 import hashlib
 import os
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 import httpx
-
-if TYPE_CHECKING:
-    import chromadb as _chromadb
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
@@ -37,7 +34,7 @@ def _embed(texts: list[str]) -> list[list[float]]:
 def chunk_id(chunk: ChunkLike) -> str:
     """Deterministic ID so re-indexing a file replaces rather than duplicates chunks."""
     key = f"{chunk.file_path}:{chunk.start_line}:{chunk.end_line}"
-    return hashlib.md5(key.encode()).hexdigest()
+    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
 
 class ChunkStore:
