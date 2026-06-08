@@ -6,8 +6,6 @@ chunk_text() is used so tests never touch the real filesystem.
 
 import textwrap
 
-import pytest
-
 from rag.chunker import Chunk, chunk_text, detect_language
 
 

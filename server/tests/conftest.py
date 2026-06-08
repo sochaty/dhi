@@ -7,7 +7,6 @@ Design rule (see ARCHITECTURE.md):
 """
 
 import textwrap
-from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -129,7 +128,6 @@ def api_client(fake_store) -> TestClient:
     sys.modules.pop("main", None)
 
     with patch("rag.store.ChunkStore", return_value=fake_store):
-        import main  # store = ChunkStore() → returns fake_store
         from main import app
 
     return TestClient(app)

@@ -4,10 +4,7 @@ Mocks: httpx.post (embed API) and chromadb.HttpClient (vector store).
 No real Chroma or Ollama process is started.
 """
 
-from dataclasses import dataclass
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from rag.chunker import Chunk
 from rag.store import ChunkStore, chunk_id

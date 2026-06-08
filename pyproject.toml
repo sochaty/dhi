@@ -35,6 +35,18 @@ ignore = [
 # Only rag/store.py may import chromadb — no other module.
 "chromadb" = { msg = "Import chromadb only in rag/store.py (Architecture rule #1)" }
 
+[tool.ruff.lint.per-file-ignores]
+# rag/store.py is the ONE allowed importer of chromadb (Architecture rule #1).
+# The lazy import inside __init__ avoids the NumPy 2.0 crash at test-collection
+# time, so TID251 is suppressed here and only here.
+"server/rag/store.py" = ["TID251"]
+
+[tool.ruff.lint.isort]
+# Treat server-side packages as first-party so they sort into their own import
+# group and test files with a blank line before `from rag.*` / `from inference.*`
+# pass the I001 check.
+known-first-party = ["inference", "rag", "main"]
+
 # ── mypy ──────────────────────────────────────────────────────────────────────
 
 [tool.mypy]
