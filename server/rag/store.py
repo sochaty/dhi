@@ -40,6 +40,7 @@ def chunk_id(chunk: ChunkLike) -> str:
 class ChunkStore:
     def __init__(self, *, host: str = CHROMA_HOST, port: int = CHROMA_PORT) -> None:
         import chromadb  # lazy — avoids import-time numpy crash in unit tests
+
         client = chromadb.HttpClient(host=host, port=port)
         self._col = client.get_or_create_collection(
             name=COLLECTION_NAME,

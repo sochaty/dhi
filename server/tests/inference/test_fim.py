@@ -22,6 +22,7 @@ from inference.fim import (
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _request(
     prefix: str = "def foo():\n    ",
     suffix: str = "\n    return result",
@@ -50,6 +51,7 @@ def _store(results: list[str] | None = None) -> MagicMock:
 
 
 # ── build_fim_prompt ───────────────────────────────────────────────────────────
+
 
 class TestBuildFimPrompt:
     def test_prompt_contains_all_three_tokens(self):
@@ -132,6 +134,7 @@ class TestBuildFimPrompt:
 
 
 # ── complete() ────────────────────────────────────────────────────────────────
+
 
 class TestComplete:
     def test_returns_response_text(self):

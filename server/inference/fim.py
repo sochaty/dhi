@@ -49,9 +49,7 @@ def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
 
     if context_chunks:
         context_block = "\n\n".join(context_chunks)
-        fim_prefix_content = (
-            f"# Repo context\n{context_block}\n\n# Current file\n{prefix}"
-        )
+        fim_prefix_content = f"# Repo context\n{context_block}\n\n# Current file\n{prefix}"
     else:
         fim_prefix_content = prefix
 

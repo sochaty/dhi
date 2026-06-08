@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 # ── Fake ChunkStore ────────────────────────────────────────────────────────────
 
+
 class FakeChunkStore:
     """In-memory replacement for ChunkStore.
 
@@ -110,6 +111,7 @@ def fake_store_with_results() -> FakeChunkStore:
 
 
 # ── FastAPI test client ────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def api_client(fake_store) -> TestClient:

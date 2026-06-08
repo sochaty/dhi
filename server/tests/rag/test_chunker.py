@@ -10,6 +10,7 @@ from rag.chunker import Chunk, chunk_text, detect_language
 
 # ── detect_language ────────────────────────────────────────────────────────────
 
+
 class TestDetectLanguage:
     def test_python_extension(self):
         assert detect_language("app.py") == "python"
@@ -33,6 +34,7 @@ class TestDetectLanguage:
 
 
 # ── chunk_text — Python ────────────────────────────────────────────────────────
+
 
 class TestChunkTextPython:
     def test_function_becomes_one_chunk(self):
@@ -141,6 +143,7 @@ class TestChunkTextPython:
 
 # ── chunk_text — TypeScript ────────────────────────────────────────────────────
 
+
 class TestChunkTextTypeScript:
     def test_function_declaration(self):
         src = "function greet(name: string): string { return `Hello ${name}`; }\n"
@@ -184,6 +187,7 @@ class TestChunkTextTypeScript:
 
 
 # ── Chunk dataclass ────────────────────────────────────────────────────────────
+
 
 class TestChunkDataclass:
     def test_chunk_fields(self):

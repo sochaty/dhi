@@ -11,13 +11,12 @@ from rag.store import ChunkStore, chunk_id
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _fake_embed_response(texts: list[str]):
     """Return a mock httpx response whose .json() gives fake embeddings."""
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
-    mock_resp.json.return_value = {
-        "embeddings": [[float(i)] * 768 for i in range(len(texts))]
-    }
+    mock_resp.json.return_value = {"embeddings": [[float(i)] * 768 for i in range(len(texts))]}
     return mock_resp
 
 
@@ -53,6 +52,7 @@ def _make_store(chroma_mock: MagicMock) -> ChunkStore:
 
 # ── chunk_id ───────────────────────────────────────────────────────────────────
 
+
 class TestChunkId:
     def test_deterministic(self):
         c = _make_chunk(file_path="/a.py", start_line=5, end_line=10)
@@ -78,6 +78,7 @@ class TestChunkId:
 
 # ── ChunkStore.upsert ──────────────────────────────────────────────────────────
 
+
 class TestChunkStoreUpsert:
     def test_upsert_calls_embed_then_chroma(self):
         col = MagicMock()
@@ -85,7 +86,9 @@ class TestChunkStoreUpsert:
         store._col = col
 
         chunk = _make_chunk()
-        with patch("rag.store.httpx.post", return_value=_fake_embed_response([chunk.text])) as mock_post:
+        with patch(
+            "rag.store.httpx.post", return_value=_fake_embed_response([chunk.text])
+        ) as mock_post:
             store.upsert([chunk])
 
         mock_post.assert_called_once()
@@ -110,7 +113,9 @@ class TestChunkStoreUpsert:
         chunks = [_make_chunk(start_line=i, end_line=i) for i in range(1, 4)]
         expected_ids = [chunk_id(c) for c in chunks]
 
-        with patch("rag.store.httpx.post", return_value=_fake_embed_response([c.text for c in chunks])):
+        with patch(
+            "rag.store.httpx.post", return_value=_fake_embed_response([c.text for c in chunks])
+        ):
             store.upsert(chunks)
 
         _, kwargs = col.upsert.call_args
@@ -151,6 +156,7 @@ class TestChunkStoreUpsert:
 
 
 # ── ChunkStore.query ───────────────────────────────────────────────────────────
+
 
 class TestChunkStoreQuery:
     def test_query_returns_documents(self):
@@ -193,6 +199,7 @@ class TestChunkStoreQuery:
 
 # ── ChunkStore.delete_file ─────────────────────────────────────────────────────
 
+
 class TestChunkStoreDeleteFile:
     def test_delete_file_removes_matching_docs(self):
         col = MagicMock()
@@ -202,9 +209,7 @@ class TestChunkStoreDeleteFile:
 
         store.delete_file("/repo/foo.py")
 
-        col.get.assert_called_once_with(
-            where={"file_path": "/repo/foo.py"}, include=["documents"]
-        )
+        col.get.assert_called_once_with(where={"file_path": "/repo/foo.py"}, include=["documents"])
         col.delete.assert_called_once_with(ids=["id1", "id2"])
 
     def test_delete_file_no_match_skips_delete(self):

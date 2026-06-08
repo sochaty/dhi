@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 # ── GET /health ────────────────────────────────────────────────────────────────
 
+
 class TestHealthEndpoint:
     def test_returns_200(self, api_client):
         resp = api_client.get("/health")
@@ -28,6 +29,7 @@ class TestHealthEndpoint:
 
 
 # ── POST /complete ─────────────────────────────────────────────────────────────
+
 
 def _ollama_ok(text: str = "    result = 42") -> MagicMock:
     m = MagicMock()
@@ -93,6 +95,7 @@ class TestCompleteEndpoint:
 
 # ── POST /index ────────────────────────────────────────────────────────────────
 
+
 class TestIndexEndpoint:
     def test_returns_200_and_indexed_count(self, api_client, tmp_path):
         src_file = tmp_path / "sample.py"
@@ -115,9 +118,7 @@ class TestIndexEndpoint:
 
     def test_index_stores_chunks_in_fake_store(self, api_client, fake_store, tmp_path):
         src_file = tmp_path / "module.py"
-        src_file.write_text(
-            "def alpha(): pass\ndef beta(): pass\n", encoding="utf-8"
-        )
+        src_file.write_text("def alpha(): pass\ndef beta(): pass\n", encoding="utf-8")
 
         resp = api_client.post("/index", json={"file_path": str(src_file)})
         assert resp.status_code == 200

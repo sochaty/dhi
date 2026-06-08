@@ -14,6 +14,7 @@ store = ChunkStore()
 
 # ── Request / response models ──────────────────────────────────────────────────
 
+
 class CompleteRequest(BaseModel):
     file_path: str
     prefix: str
@@ -34,6 +35,7 @@ class IndexResponse(BaseModel):
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 def health():

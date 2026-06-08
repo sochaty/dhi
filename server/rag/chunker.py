@@ -16,7 +16,7 @@ CHUNK_NODE_TYPES: dict[str, set[str]] = {
     "python": {
         "import_statement",
         "import_from_statement",
-        "function_definition",   # covers both def and async def in tree-sitter 0.23+
+        "function_definition",  # covers both def and async def in tree-sitter 0.23+
         "class_definition",
     },
     "typescript": {
