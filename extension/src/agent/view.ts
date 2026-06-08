@@ -9,7 +9,7 @@ import * as vscode from 'vscode';
 import { DhiClient } from '../client';
 
 export class AgentView {
-  static show(context: vscode.ExtensionContext, client: DhiClient): void {
+  static show(_context: vscode.ExtensionContext, _client: DhiClient): void {
     vscode.window.showInformationMessage(
       'Dhi: Agent mode is coming in Post 4 of the series.',
     );

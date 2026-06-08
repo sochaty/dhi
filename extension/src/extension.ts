@@ -12,7 +12,6 @@ import * as vscode from 'vscode';
 import { DhiClient } from './client';
 import { FIMCompletionProvider } from './completion/provider';
 import { ChatPanel } from './chat/panel';
-import { AgentView } from './agent/view';
 
 let statusBar: vscode.StatusBarItem;
 

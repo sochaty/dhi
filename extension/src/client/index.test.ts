@@ -30,7 +30,7 @@ import { DhiClient } from './index';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function mockFetch(response: { ok: boolean; status?: number; json?: () => unknown; text?: () => string }) {
+function mockFetch(response: { ok: boolean; status?: number; json?: () => unknown; text?: string }) {
   const stub = sinon.stub(global, 'fetch').resolves({
     ok: response.ok,
     status: response.status ?? (response.ok ? 200 : 500),

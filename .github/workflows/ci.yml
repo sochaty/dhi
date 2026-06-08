@@ -100,7 +100,13 @@ jobs:
         run: bandit -r . --exclude ./tests -ll -ii
 
       - name: pip-audit dependency CVE scan
-        run: pip-audit -r requirements.txt
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln GHSA-f4j7-r4q5-qw2c \
+            --ignore-vuln PYSEC-2026-161
+          # GHSA-f4j7-r4q5-qw2c: chromadb — no fix released upstream yet
+          # PYSEC-2026-161: starlette — fix requires starlette>=1.0.1 which
+          #   breaks FastAPI 0.x; re-evaluate when FastAPI ships starlette 1.x support
 
   # ── VS Code extension: lint & type-check ─────────────────────────────────────
   extension-lint:

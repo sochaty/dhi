@@ -60,18 +60,14 @@ import { FIMCompletionProvider } from './provider';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeDocument(languageId: string, text: string) {
-  const pos0 = new FakePosition(0, 0);
-  const cursorPos = new FakePosition(1, 0);
   return {
     languageId,
     uri: { fsPath: '/repo/foo.py' },
     getText: sinon.stub().callsFake((range?: FakeRange) => {
       if (!range) return text;
-      // Before cursor: first line only
       if (range.start.line === 0 && range.start.character === 0) {
         return text.split('\n')[0] + '\n';
       }
-      // After cursor: rest
       return text.split('\n').slice(1).join('\n');
     }),
     positionAt: sinon.stub().returns(new FakePosition(99, 0)),
