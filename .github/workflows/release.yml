@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "post-*"    # repo checkpoints — push Docker image only
+      - "v*.*.*"    # semantic releases — push Docker + publish extension
+
+jobs:
+  # ── Push server Docker image to GHCR ─────────────────────────────────────────
+  docker-push:
+    name: Docker — push to GHCR
+    runs-on: ubuntu-latest
+    # Production environment: requires manual approval from @sochaty before
+    # any image is pushed. Configure in:
+    # GitHub → Settings → Environments → production → Required reviewers
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/server
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: server
+          file: server/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy scan pushed image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/server:${{ github.ref_name }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ── Publish VS Code extension ─────────────────────────────────────────────────
+  vsce-publish:
+    name: Extension — publish to VS Code Marketplace
+    runs-on: ubuntu-latest
+    # Only on semver tags — post-* are checkpoint tags, not marketplace releases
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    needs: docker-push
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: extension
+        run: npm install
+
+      - name: Compile
+        working-directory: extension
+        run: npm run compile
+
+      - name: Publish to VS Code Marketplace
+        working-directory: extension
+        run: npx vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX Registry
+        working-directory: extension
+        run: npx ovsx publish -p ${{ secrets.OVSX_PAT }}
+
+  # ── Create GitHub Release with auto-generated changelog ──────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: docker-push
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          make_latest: true

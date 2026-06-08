@@ -1,0 +1,13 @@
+# CODEOWNERS — every PR automatically requests a review from @sochaty.
+# GitHub branch protection + this file = no PR merges without your approval.
+#
+# Syntax: <pattern> <owner> [<owner> ...]
+# The last matching rule takes precedence.
+
+# Default: all files require review from @sochaty
+*                   @sochaty
+
+# CI/CD changes additionally require the repo owner (same person here,
+# but explicit so it's clear this path is sensitive)
+.github/workflows/  @sochaty
+pyproject.toml      @sochaty

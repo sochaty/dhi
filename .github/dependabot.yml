@@ -1,0 +1,71 @@
+version: 2
+
+updates:
+  # ── Python server dependencies ─────────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    # Group all non-breaking updates into a single PR to reduce noise
+    groups:
+      python-dev-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - dependencies
+      - python
+    reviewers:
+      - sochaty
+
+  # ── VS Code extension dependencies ────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /extension
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    groups:
+      extension-deps:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - dependencies
+      - typescript
+    reviewers:
+      - sochaty
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - dependencies
+      - ci-cd
+    reviewers:
+      - sochaty
+
+  # ── Docker base images ─────────────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    labels:
+      - dependencies
+      - docker
+    reviewers:
+      - sochaty

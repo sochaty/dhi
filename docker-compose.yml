@@ -1,0 +1,64 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "8000:8000"
+    environment:
+      - CHROMA_HOST=chroma
+      - OLLAMA_HOST=ollama
+      - FIM_MODEL=${FIM_MODEL:-starcoder2:3b}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
+      - FIM_MODEL_MAX_TOKENS=${FIM_MODEL_MAX_TOKENS:-64}
+    depends_on:
+      chroma:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chroma:
+    image: chromadb/chroma:0.5.5
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    entrypoint: >
+      /bin/sh -c "
+        ollama serve &
+        echo 'Waiting for Ollama to be ready...' &&
+        until ollama list > /dev/null 2>&1; do sleep 2; done &&
+        echo 'Pulling FIM model...' &&
+        ollama pull ${FIM_MODEL:-starcoder2:3b} &&
+        echo 'Pulling embed model...' &&
+        ollama pull ${EMBED_MODEL:-nomic-embed-text} &&
+        echo 'Models ready.' &&
+        wait
+      "
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  chroma_data:
+  ollama_models:

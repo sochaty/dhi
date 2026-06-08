@@ -1,0 +1,244 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Cancel in-progress runs on the same branch when a new commit is pushed.
+# This prevents stale CI runs from blocking merges.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Python server: lint & type-check ─────────────────────────────────────────
+  server-lint:
+    name: Server — lint & type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff lint
+        run: ruff check .
+
+      - name: ruff format check
+        run: ruff format --check .
+
+      - name: mypy type-check
+        run: mypy .
+
+  # ── Python server: unit tests + coverage ─────────────────────────────────────
+  server-test:
+    name: Server — unit tests (coverage ≥ 75%)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r server/requirements-dev.txt
+
+      - name: pytest with coverage
+        run: |
+          pytest -m "not integration" \
+            --tb=short \
+            --cov=server \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=75
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: coverage.xml
+          flags: server
+          fail_ci_if_error: false
+
+  # ── Python server: security scan ─────────────────────────────────────────────
+  server-security:
+    name: Server — security scan (bandit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: bandit SAST scan
+        # -ll = only medium+ severity, -ii = only medium+ confidence
+        # Skips test files (low-trust code is expected to look sketchy)
+        run: bandit -r . --exclude ./tests -ll -ii
+
+      - name: pip-audit dependency CVE scan
+        run: |
+          pip-audit -r requirements.txt \
+            --ignore-vuln GHSA-f4j7-r4q5-qw2c \
+            --ignore-vuln PYSEC-2026-161
+          # GHSA-f4j7-r4q5-qw2c: chromadb — no fix released upstream yet
+          # PYSEC-2026-161: starlette — fix requires starlette>=1.0.1 which
+          #   breaks FastAPI 0.x; re-evaluate when FastAPI ships starlette 1.x support
+
+  # ── VS Code extension: lint & type-check ─────────────────────────────────────
+  extension-lint:
+    name: Extension — lint & type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+  # ── VS Code extension: unit tests ────────────────────────────────────────────
+  extension-test:
+    name: Extension — unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Mocha tests
+        run: npm test
+
+  # ── VS Code extension: dependency audit ──────────────────────────────────────
+  extension-security:
+    name: Extension — npm audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      # --audit-level=high: fail only on high/critical CVEs, ignore low/moderate
+      # devDependencies rarely end up in the shipped .vsix
+      - name: npm audit
+        run: npm audit --audit-level=high --omit=dev
+
+  # ── Docker: build + vulnerability scan ───────────────────────────────────────
+  docker-build:
+    name: Docker — build & scan
+    runs-on: ubuntu-latest
+    needs: [server-lint, server-test]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
+      - name: Build server image
+        uses: docker/build-push-action@v5
+        with:
+          context: server
+          file: server/Dockerfile
+          push: false
+          tags: dhi-server:ci
+          load: true
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: dhi-server:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          # Fail on HIGH and CRITICAL CVEs only
+          severity: HIGH,CRITICAL
+
+  # ── Gate job: branch protection requires only this one check ─────────────────
+  #
+  # All other jobs feed into this. Branch protection is configured to require
+  # "all-checks" — so adding a new job above is enough to block merges;
+  # no settings change needed.
+  all-checks:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs:
+      - server-lint
+      - server-test
+      - server-security
+      - extension-lint
+      - extension-test
+      - extension-security
+      - docker-build
+    # Run even if upstream jobs were cancelled or failed, so the gate always
+    # produces a result and GitHub branch protection doesn't see "pending".
+    if: always()
+
+    steps:
+      - name: Verify all required jobs passed
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Job results: $results"
+          for result in $results; do
+            if [[ "$result" != "success" ]]; then
+              echo "One or more required jobs did not pass."
+              exit 1
+            fi
+          done
+          echo "All checks passed — safe to merge."
