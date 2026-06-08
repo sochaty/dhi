@@ -20,7 +20,6 @@ from inference.fim import (
     complete,
 )
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _request(

@@ -8,7 +8,6 @@ import textwrap
 
 from rag.chunker import Chunk, chunk_text, detect_language
 
-
 # ── detect_language ────────────────────────────────────────────────────────────
 
 class TestDetectLanguage:

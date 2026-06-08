@@ -9,7 +9,6 @@ from unittest.mock import MagicMock, patch
 from rag.chunker import Chunk
 from rag.store import ChunkStore, chunk_id
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _fake_embed_response(texts: list[str]):
