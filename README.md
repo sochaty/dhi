@@ -59,7 +59,8 @@ docker compose up -d
 
 ```bash
 # 2. Install the VS Code extension
-# Extensions panel → search "Dhi" → Install
+# Download dhi-0.1.0.vsix from the latest GitHub release, then:
+# Extensions panel (Ctrl+Shift+X) → ⋯ menu → "Install from VSIX…"
 
 # 3. Open any Python or TypeScript file and start typing
 # 4. Optional: Cmd/Ctrl+Shift+P → "Dhi: Index Workspace" for better context
