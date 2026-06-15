@@ -148,7 +148,10 @@ def _mock_client(response: MagicMock) -> MagicMock:
 class TestComplete:
     async def test_returns_response_text(self):
         store = _store()
-        with patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("    result = 42"))):
+        with patch(
+            "inference.fim.httpx.AsyncClient",
+            return_value=_mock_client(_ollama_response("    result = 42")),
+        ):
             result = await complete(_request(), store)
         assert result == "    result = 42"
 
@@ -156,8 +159,10 @@ class TestComplete:
         store = _store()
         prefix = "some code\n" + "x" * 300  # last 200 chars is what gets queried
         req = _request(prefix=prefix)
-        with patch("inference.fim.FIM_USE_RAG", True), \
-             patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())):
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
+        ):
             await complete(req, store)
         store.query.assert_called_once()
         query_arg = store.query.call_args[0][0]
@@ -166,8 +171,10 @@ class TestComplete:
     async def test_uses_file_path_as_fallback_query_when_prefix_empty(self):
         store = _store()
         req = _request(prefix="   ", file_path="/repo/utils.py")
-        with patch("inference.fim.FIM_USE_RAG", True), \
-             patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())):
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
+        ):
             await complete(req, store)
         query_arg = store.query.call_args[0][0]
         assert query_arg == "/repo/utils.py"
@@ -186,15 +193,19 @@ class TestComplete:
 
         client.post = fake_post
 
-        with patch("inference.fim.FIM_USE_RAG", True), \
-             patch("inference.fim.httpx.AsyncClient", return_value=client):
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=client),
+        ):
             await complete(_request(), store)
 
         assert "def helper(): return 1" in captured["prompt"]
 
     async def test_empty_store_results_still_completes(self):
         store = _store(results=[])
-        with patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))):
+        with patch(
+            "inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))
+        ):
             result = await complete(_request(), store)
         assert result == "x = 1"
 
@@ -251,7 +262,9 @@ class TestComplete:
 
     async def test_rag_disabled_by_default_skips_store_query(self):
         store = _store(results=["def helper(): return 1"])
-        with patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))):
+        with patch(
+            "inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))
+        ):
             result = await complete(_request(), store)
         store.query.assert_not_called()
         assert result == "x = 1"

@@ -110,7 +110,7 @@ export class FIMCompletionProvider
       // The lock on the server is held while Ollama generates; an early fetch
       // (fired mid-typing) can hold it for several seconds.  Waiting 2 s and
       // retrying once lets the lock release before we give up.
-      let response = await this.client.complete(reqBody, controller.signal).catch(
+      const response = await this.client.complete(reqBody, controller.signal).catch(
         async (firstErr: unknown) => {
           const isBusy = String((firstErr as { message?: string }).message ?? '').includes('503');
           if (!isBusy) throw firstErr;

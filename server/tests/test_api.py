@@ -66,7 +66,9 @@ class TestCompleteEndpoint:
         assert resp.status_code == 422
 
     def test_ollama_error_returns_500(self, api_client):
-        with patch("main.complete", new_callable=AsyncMock, side_effect=Exception("connection refused")):
+        with patch(
+            "main.complete", new_callable=AsyncMock, side_effect=Exception("connection refused")
+        ):
             resp = api_client.post("/complete", json=_COMPLETE_PAYLOAD)
         assert resp.status_code == 500
 
