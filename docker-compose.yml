@@ -7,31 +7,22 @@ services:
       - CHROMA_HOST=chroma
       - OLLAMA_HOST=ollama
       - FIM_MODEL=${FIM_MODEL:-starcoder2:3b}
-      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
-      - FIM_MODEL_MAX_TOKENS=${FIM_MODEL_MAX_TOKENS:-64}
+      - EMBED_MODEL=${EMBED_MODEL:-starcoder2:3b}
+      - FIM_MODEL_MAX_TOKENS=${FIM_MODEL_MAX_TOKENS:-20}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
     depends_on:
       chroma:
-        condition: service_healthy
+        condition: service_started
       ollama:
         condition: service_healthy
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   chroma:
-    image: chromadb/chroma:0.5.5
+    image: chromadb/chroma:latest
     ports:
       - "8001:8000"
     volumes:
       - chroma_data:/chroma/chroma
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
 
   ollama:
     image: ollama/ollama:latest

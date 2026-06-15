@@ -23,6 +23,8 @@ export interface CompleteResponse {
 
 export interface IndexRequest {
   file_path: string;
+  content: string;
+  language: string;
 }
 
 export interface IndexResponse {
@@ -46,8 +48,8 @@ export class DhiClient {
     return this._get<HealthResponse>('/health');
   }
 
-  async complete(req: CompleteRequest): Promise<CompleteResponse> {
-    return this._post<CompleteResponse>('/complete', req);
+  async complete(req: CompleteRequest, signal?: AbortSignal): Promise<CompleteResponse> {
+    return this._post<CompleteResponse>('/complete', req, signal);
   }
 
   async index(req: IndexRequest): Promise<IndexResponse> {
@@ -63,11 +65,12 @@ export class DhiClient {
     return resp.json() as Promise<T>;
   }
 
-  private async _post<T>(path: string, body: unknown): Promise<T> {
+  private async _post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
     const resp = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal,
     });
     if (!resp.ok) {
       const text = await resp.text();

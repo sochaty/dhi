@@ -14,8 +14,13 @@ import { FIMCompletionProvider } from './completion/provider';
 import { ChatPanel } from './chat/panel';
 
 let statusBar: vscode.StatusBarItem;
+export let log: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext): void {
+  log = vscode.window.createOutputChannel('Dhi');
+  context.subscriptions.push(log);
+  log.appendLine('[Dhi] Extension activated');
+
   const client = new DhiClient(() =>
     vscode.workspace.getConfiguration('dhi').get<string>('serverUrl', 'http://localhost:8000'),
   );
@@ -60,16 +65,20 @@ export function activate(context: vscode.ExtensionContext): void {
         { location: vscode.ProgressLocation.Notification, title: 'Dhi: Indexing workspace…' },
         async (progress) => {
           const files = await vscode.workspace.findFiles(
-            '**/*.{py,ts,tsx,js,jsx,go,rs,java}',
-            '**/node_modules/**',
+            '**/*.{py,ts,tsx}',
+            '{**/node_modules/**,**/.venv/**,**/dist/**,**/build/**,**/__pycache__/**}',
           );
           for (const file of files) {
+            const language = _languageFromPath(file.fsPath);
+            if (!language) continue;
             try {
-              const result = await client.index({ file_path: file.fsPath });
+              const bytes = await vscode.workspace.fs.readFile(file);
+              const content = Buffer.from(bytes).toString('utf8');
+              const result = await client.index({ file_path: file.fsPath, content, language });
               total += result.indexed;
               progress.report({ message: `${file.fsPath} (${result.indexed} chunks)` });
             } catch {
-              // Skip files that fail to index (binary, too large, etc.)
+              // Skip files that fail to index (binary, too large, encoding errors)
             }
           }
         },
@@ -82,6 +91,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   statusBar?.dispose();
+}
+
+function _languageFromPath(fsPath: string): string | null {
+  if (fsPath.endsWith('.py')) return 'python';
+  if (fsPath.endsWith('.ts') || fsPath.endsWith('.tsx')) return 'typescript';
+  return null;
 }
 
 async function _pingServer(client: DhiClient): Promise<void> {
