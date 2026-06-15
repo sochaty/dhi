@@ -126,7 +126,7 @@ jobs:
 
       - name: Build VSIX
         working-directory: extension
-        run: npm install && npx vsce package --out dhi.vsix
+        run: npm install && npm run compile && npx vsce package --out dhi.vsix
 
       - name: Create release
         uses: softprops/action-gh-release@v2

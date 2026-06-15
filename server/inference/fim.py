@@ -1,20 +1,26 @@
+import logging
 import os
+import re
 from dataclasses import dataclass
 
 import httpx
 
+log = logging.getLogger(__name__)
+
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost")
 FIM_MODEL = os.getenv("FIM_MODEL", "starcoder2:3b")
-FIM_MODEL_MAX_TOKENS = int(os.getenv("FIM_MODEL_MAX_TOKENS", "64"))
+FIM_MODEL_MAX_TOKENS = int(os.getenv("FIM_MODEL_MAX_TOKENS", "10"))
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
 
 # Supported by StarCoder2, DeepSeek-Coder, and Qwen2.5-Coder
 FIM_PREFIX_TOKEN = "<fim_prefix>"
 FIM_SUFFIX_TOKEN = "<fim_suffix>"
 FIM_MIDDLE_TOKEN = "<fim_middle>"
 
-# Truncate to avoid quadratic prompt-processing cost on long files
-MAX_PREFIX_CHARS = 3_200
-MAX_SUFFIX_CHARS = 1_600
+# Keep context tiny — CPU prefill is ~10 tok/s; 3200 chars = ~900 tokens = 90 s timeout.
+# 512 chars ≈ 130 tokens → ~13 s prefill; generation stops at first "\n" (1–5 tokens).
+MAX_PREFIX_CHARS = 256
+MAX_SUFFIX_CHARS = 128
 # Search the last N chars of prefix for the context query
 QUERY_WINDOW = 200
 
@@ -25,6 +31,37 @@ class FIMRequest:
     prefix: str
     suffix: str
     language: str
+
+
+_NEXT_SCOPE_RE = re.compile(r"\n(?:async )?def |\nclass ")
+_DEF_RE = re.compile(r"^(?:async )?def |^class ", re.MULTILINE)
+
+
+def _trim_prefix(prefix: str, max_chars: int) -> str:
+    """Take the last max_chars of prefix, then advance to the most recent
+    function/class definition so that section-header comments (# --- X ---)
+    before it don't corrupt the FIM prompt.
+    """
+    raw = prefix[-max_chars:]
+    # Find the last def/class inside the window
+    last = None
+    for m in _DEF_RE.finditer(raw):
+        last = m
+    if last and last.start() > 0:
+        return raw[last.start():]
+    return raw
+
+
+def _trim_suffix(suffix: str, max_chars: int) -> str:
+    """Stop at the next top-level def/class boundary, or max_chars — whichever comes first.
+
+    128 raw chars of suffix can slice into an adjacent function and confuse the
+    model.  Stopping at the next function boundary gives a semantically clean
+    suffix (just the remainder of the current scope).
+    """
+    match = _NEXT_SCOPE_RE.search(suffix)
+    limit = match.start() if match else len(suffix)
+    return suffix[: min(max_chars, limit)]
 
 
 def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
@@ -44,8 +81,14 @@ def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
     {suffix_truncated}
     <fim_middle>
     """
-    prefix = request.prefix[-MAX_PREFIX_CHARS:]
-    suffix = request.suffix[:MAX_SUFFIX_CHARS]
+    # Normalize Windows CRLF → LF; bare \r (old Mac) → LF.
+    # StarCoder2 was trained on Unix line endings — CRLF in the prompt causes
+    # hallucinations because \r is not in the stop-token list.
+    def _lf(s: str) -> str:
+        return s.replace('\r\n', '\n').replace('\r', '\n')
+
+    prefix = _lf(_trim_prefix(request.prefix, MAX_PREFIX_CHARS))
+    suffix = _lf(_trim_suffix(request.suffix, MAX_SUFFIX_CHARS))
 
     if context_chunks:
         context_block = "\n\n".join(context_chunks)
@@ -78,14 +121,22 @@ def complete(request: FIMRequest, store) -> str:
         json={
             "model": FIM_MODEL,
             "prompt": prompt,
+            "raw": True,
             "stream": False,
             "options": {
                 "num_predict": FIM_MODEL_MAX_TOKENS,
                 "temperature": 0.1,
-                "stop": ["\n\n", FIM_PREFIX_TOKEN, FIM_SUFFIX_TOKEN],
+                "stop": ["\n", FIM_PREFIX_TOKEN, FIM_SUFFIX_TOKEN, FIM_MIDDLE_TOKEN, "<|endoftext|>"],
             },
         },
-        timeout=10,
+        timeout=OLLAMA_TIMEOUT,
     )
     resp.raise_for_status()
-    return resp.json()["response"]
+    data = resp.json()
+    log.info(
+        "FIM done_reason=%s response=%r prompt_tail=%r",
+        data.get("done_reason"),
+        data.get("response", ""),
+        prompt[-120:],
+    )
+    return data["response"]
