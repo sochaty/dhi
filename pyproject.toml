@@ -62,6 +62,7 @@ exclude = ["server/tests/"]
 [tool.pytest.ini_options]
 testpaths = ["server/tests"]
 addopts = "-v -m 'not integration'"
+asyncio_mode = "auto"
 markers = [
     "integration: tests that require running Docker services (Chroma, Ollama)",
 ]
