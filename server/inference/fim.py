@@ -11,6 +11,9 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost")
 FIM_MODEL = os.getenv("FIM_MODEL", "starcoder2:3b")
 FIM_MODEL_MAX_TOKENS = int(os.getenv("FIM_MODEL_MAX_TOKENS", "10"))
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
+# Small models (≤7B) hallucinate from RAG context — they copy retrieved chunks
+# instead of using them as reference.  Enable only when using a larger model.
+FIM_USE_RAG = os.getenv("FIM_USE_RAG", "false").lower() == "true"
 
 # Supported by StarCoder2, DeepSeek-Coder, and Qwen2.5-Coder
 FIM_PREFIX_TOKEN = "<fim_prefix>"
@@ -48,7 +51,7 @@ def _trim_prefix(prefix: str, max_chars: int) -> str:
     for m in _DEF_RE.finditer(raw):
         last = m
     if last and last.start() > 0:
-        return raw[last.start():]
+        return raw[last.start() :]
     return raw
 
 
@@ -81,11 +84,12 @@ def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
     {suffix_truncated}
     <fim_middle>
     """
+
     # Normalize Windows CRLF → LF; bare \r (old Mac) → LF.
     # StarCoder2 was trained on Unix line endings — CRLF in the prompt causes
     # hallucinations because \r is not in the stop-token list.
     def _lf(s: str) -> str:
-        return s.replace('\r\n', '\n').replace('\r', '\n')
+        return s.replace("\r\n", "\n").replace("\r", "\n")
 
     prefix = _lf(_trim_prefix(request.prefix, MAX_PREFIX_CHARS))
     suffix = _lf(_trim_suffix(request.suffix, MAX_SUFFIX_CHARS))
@@ -105,32 +109,44 @@ def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
     )
 
 
-def complete(request: FIMRequest, store) -> str:
+async def complete(request: FIMRequest, store) -> str:
     """Run a FIM completion via Ollama and return the generated text.
 
     ``store`` is typed as Any to avoid a circular import; it must expose a
     ``query(text: str, n_results: int) -> list[str]`` method.
+
+    Using async httpx so that cancellation propagates: when the VS Code
+    extension aborts its HTTP connection (user typed again), FastAPI cancels
+    this coroutine, which closes the TCP connection to Ollama, which causes
+    Ollama's Go request context to cancel mid-generation — releasing the GPU/CPU
+    for the next request instead of holding it for 5–7 seconds.
     """
     query_text = request.prefix[-QUERY_WINDOW:].strip() or request.file_path
-    context_chunks: list[str] = store.query(query_text, n_results=3)
+    context_chunks: list[str] = store.query(query_text, n_results=3) if FIM_USE_RAG else []
 
     prompt = build_fim_prompt(request, context_chunks)
 
-    resp = httpx.post(
-        f"http://{OLLAMA_HOST}:11434/api/generate",
-        json={
-            "model": FIM_MODEL,
-            "prompt": prompt,
-            "raw": True,
-            "stream": False,
-            "options": {
-                "num_predict": FIM_MODEL_MAX_TOKENS,
-                "temperature": 0.1,
-                "stop": ["\n", FIM_PREFIX_TOKEN, FIM_SUFFIX_TOKEN, FIM_MIDDLE_TOKEN, "<|endoftext|>"],
+    async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+        resp = await client.post(
+            f"http://{OLLAMA_HOST}:11434/api/generate",
+            json={
+                "model": FIM_MODEL,
+                "prompt": prompt,
+                "raw": True,
+                "stream": False,
+                "options": {
+                    "num_predict": FIM_MODEL_MAX_TOKENS,
+                    "temperature": 0.1,
+                    "stop": [
+                        "\n",
+                        FIM_PREFIX_TOKEN,
+                        FIM_SUFFIX_TOKEN,
+                        FIM_MIDDLE_TOKEN,
+                        "<|endoftext|>",
+                    ],
+                },
             },
-        },
-        timeout=OLLAMA_TIMEOUT,
-    )
+        )
     resp.raise_for_status()
     data = resp.json()
     log.info(

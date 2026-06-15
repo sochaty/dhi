@@ -45,7 +45,15 @@ function makeDocument(languageId: string, text: string) {
 }
 
 function makeCancelToken(cancelled = false) {
-  return { isCancellationRequested: cancelled };
+  return {
+    isCancellationRequested: cancelled,
+    onCancellationRequested: (listener: () => void) => {
+      // If already cancelled, fire the listener immediately so the debounce
+      // Promise resolves(false) before the setTimeout fires.
+      if (cancelled) listener();
+      return { dispose: () => {} };
+    },
+  };
 }
 
 function makeClient(completion: string | null) {

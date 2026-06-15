@@ -46,6 +46,18 @@ export class FIMCompletionProvider
       return null;
     }
 
+    // Only fetch at semantically meaningful positions — not mid-word.
+    // A fetch at position 10:1 (user typed "d" in "def") would grab the Ollama
+    // lock for ~7 seconds, making every subsequent fetch return "".
+    const prefix = document.getText(
+      new vscode.Range(new vscode.Position(0, 0), position),
+    );
+    const lastChar = prefix[prefix.length - 1] ?? '';
+    const triggerChars = new Set([' ', '\t', '\n', '{', ':', '.']);
+    if (lastChar !== '' && !triggerChars.has(lastChar)) {
+      return null;
+    }
+
     log.appendLine(
       `[provider] pos=${position.line}:${position.character} lang=${document.languageId}`,
     );
@@ -53,7 +65,9 @@ export class FIMCompletionProvider
     // Debounce via CancellationToken.
     // VS Code cancels the previous call's token each time the user types,
     // so this timer is automatically cleared without any extra bookkeeping.
-    const debounceMs = cfg.get<number>('completionDebounceMs', 150);
+    // 400 ms prevents firing during bursts of keystrokes (e.g. typing a
+    // function signature); still short enough to feel responsive on a pause.
+    const debounceMs = cfg.get<number>('completionDebounceMs', 400);
     const debounced = await new Promise<boolean>((resolve) => {
       const t = setTimeout(() => resolve(true), debounceMs);
       token.onCancellationRequested(() => {
@@ -74,9 +88,6 @@ export class FIMCompletionProvider
     const disposable = token.onCancellationRequested(() => controller.abort());
 
     try {
-      const prefix = document.getText(
-        new vscode.Range(new vscode.Position(0, 0), position),
-      );
       const suffix = document.getText(
         new vscode.Range(
           position,
@@ -88,14 +99,30 @@ export class FIMCompletionProvider
         `[fetch] prefix tail: "${prefix.slice(-40).replace(/\n/g, '\\n')}"`,
       );
 
-      const response = await this.client.complete(
-        {
-          file_path: document.uri.fsPath,
-          prefix,
-          suffix,
-          language: document.languageId,
+      const reqBody = {
+        file_path: document.uri.fsPath,
+        prefix,
+        suffix,
+        language: document.languageId,
+      };
+
+      // Fetch, with a single retry when the server is busy (503).
+      // The lock on the server is held while Ollama generates; an early fetch
+      // (fired mid-typing) can hold it for several seconds.  Waiting 2 s and
+      // retrying once lets the lock release before we give up.
+      let response = await this.client.complete(reqBody, controller.signal).catch(
+        async (firstErr: unknown) => {
+          const isBusy = String((firstErr as { message?: string }).message ?? '').includes('503');
+          if (!isBusy) throw firstErr;
+
+          log.appendLine('[fetch] server busy — retrying in 2 s');
+          const waited = await new Promise<boolean>((resolve) => {
+            const t = setTimeout(() => resolve(true), 2000);
+            token.onCancellationRequested(() => { clearTimeout(t); resolve(false); });
+          });
+          if (!waited || token.isCancellationRequested) return null;
+          return this.client.complete(reqBody, controller.signal);
         },
-        controller.signal,
       );
 
       if (token.isCancellationRequested) {
@@ -103,11 +130,12 @@ export class FIMCompletionProvider
         return null;
       }
 
-      log.appendLine(`[fetch] response: "${response.completion}"`);
-
-      if (!response.completion.trim()) {
+      if (!response || !response.completion.trim()) {
+        log.appendLine(`[fetch] response: "${response?.completion ?? '(null)'}"`);
         return null;
       }
+
+      log.appendLine(`[fetch] response: "${response.completion}"`);
 
       return new vscode.InlineCompletionList([
         new vscode.InlineCompletionItem(

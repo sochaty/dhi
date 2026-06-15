@@ -61,6 +61,14 @@ const vscodeExports = {
     onDidChangeConfiguration: () => ({ dispose: () => {} }),
   },
   window: {
+    createOutputChannel: (_name) => ({
+      appendLine: () => {},
+      append: () => {},
+      show: () => {},
+      hide: () => {},
+      clear: () => {},
+      dispose: () => {},
+    }),
     createStatusBarItem: () => ({
       text: '',
       tooltip: '',

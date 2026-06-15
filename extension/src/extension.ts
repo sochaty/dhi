@@ -14,10 +14,9 @@ import { FIMCompletionProvider } from './completion/provider';
 import { ChatPanel } from './chat/panel';
 
 let statusBar: vscode.StatusBarItem;
-export let log: vscode.OutputChannel;
+export const log: vscode.OutputChannel = vscode.window.createOutputChannel('Dhi');
 
 export function activate(context: vscode.ExtensionContext): void {
-  log = vscode.window.createOutputChannel('Dhi');
   context.subscriptions.push(log);
   log.appendLine('[Dhi] Extension activated');
 
