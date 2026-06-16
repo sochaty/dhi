@@ -277,19 +277,8 @@ Each post ships a tagged commit — `git checkout post-N` to reproduce the codeb
 
 | Post | Topic | Tag |
 |---|---|---|
-| 0 | Architecture overview | — |
-| **1** | **FIM autocomplete engine (Tree-sitter + StarCoder2)** | `post-1` |
-| 2 | Repository intelligence (hybrid search + call graph) | `post-2` |
-| 3 | In-editor chat with streaming RAG | `post-3` |
-| 4 | Multi-file agent with LangGraph | `post-4` |
-| 5 | Sandboxed code execution | `post-5` |
-| 6 | VS Code extension deep-dive + Marketplace publish | `post-6` |
-| 7 | vLLM inference and model registry | `post-7` |
-| 8 | 3× faster FIM with speculative decoding | `post-8` |
-| 9 | Multi-user platform: auth, queue, metering | `post-9` |
-| 10 | Docker Compose: zero to IDE in 60 seconds | `post-10` |
-| 11 | Deploying the shared GPU pool on RunPod | `post-11` |
-| 12 | Model benchmark: StarCoder vs DeepSeek vs Qwen | `post-12` |
+| 0 | [Architecture overview](https://sourishchakraborty.com/open-source-ai-coding-ide-architecture) | — |
+| **1** | **[FIM autocomplete engine (Tree-sitter + StarCoder2)](https://sourishchakraborty.com/dhi-fim-autocomplete-engine)** | `post-1` |
 
 Blog: [blogs.sourishchakraborty.com](https://blogs.sourishchakraborty.com)
 
