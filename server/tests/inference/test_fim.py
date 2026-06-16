@@ -5,7 +5,7 @@ The focus is prompt shape, truncation behaviour, and response parsing.
 No real Ollama process is started.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -136,84 +136,135 @@ class TestBuildFimPrompt:
 # ── complete() ────────────────────────────────────────────────────────────────
 
 
+def _mock_client(response: MagicMock) -> MagicMock:
+    """Async context manager mock for httpx.AsyncClient."""
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
+    client.post = AsyncMock(return_value=response)
+    return client
+
+
 class TestComplete:
-    def test_returns_response_text(self):
+    async def test_returns_response_text(self):
         store = _store()
-        with patch("inference.fim.httpx.post", return_value=_ollama_response("    result = 42")):
-            result = complete(_request(), store)
+        with patch(
+            "inference.fim.httpx.AsyncClient",
+            return_value=_mock_client(_ollama_response("    result = 42")),
+        ):
+            result = await complete(_request(), store)
         assert result == "    result = 42"
 
-    def test_queries_store_with_end_of_prefix(self):
+    async def test_queries_store_with_end_of_prefix(self):
         store = _store()
         prefix = "some code\n" + "x" * 300  # last 200 chars is what gets queried
         req = _request(prefix=prefix)
-        with patch("inference.fim.httpx.post", return_value=_ollama_response()):
-            complete(req, store)
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
+        ):
+            await complete(req, store)
         store.query.assert_called_once()
         query_arg = store.query.call_args[0][0]
         assert query_arg == prefix[-200:].strip()
 
-    def test_uses_file_path_as_fallback_query_when_prefix_empty(self):
+    async def test_uses_file_path_as_fallback_query_when_prefix_empty(self):
         store = _store()
         req = _request(prefix="   ", file_path="/repo/utils.py")
-        with patch("inference.fim.httpx.post", return_value=_ollama_response()):
-            complete(req, store)
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
+        ):
+            await complete(req, store)
         query_arg = store.query.call_args[0][0]
         assert query_arg == "/repo/utils.py"
 
-    def test_context_from_store_injected_into_prompt(self):
+    async def test_context_from_store_injected_into_prompt(self):
         store = _store(results=["def helper(): return 1"])
-        captured = {}
+        captured: dict = {}
 
-        def fake_post(url, json, timeout):
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+
+        async def fake_post(url, json=None, **kwargs):
             captured["prompt"] = json["prompt"]
             return _ollama_response()
 
-        with patch("inference.fim.httpx.post", side_effect=fake_post):
-            complete(_request(), store)
+        client.post = fake_post
+
+        with (
+            patch("inference.fim.FIM_USE_RAG", True),
+            patch("inference.fim.httpx.AsyncClient", return_value=client),
+        ):
+            await complete(_request(), store)
 
         assert "def helper(): return 1" in captured["prompt"]
 
-    def test_empty_store_results_still_completes(self):
+    async def test_empty_store_results_still_completes(self):
         store = _store(results=[])
-        with patch("inference.fim.httpx.post", return_value=_ollama_response("x = 1")):
-            result = complete(_request(), store)
+        with patch(
+            "inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))
+        ):
+            result = await complete(_request(), store)
         assert result == "x = 1"
 
-    def test_ollama_called_with_low_temperature(self):
+    async def test_ollama_called_with_low_temperature(self):
         store = _store()
-        captured = {}
+        captured: dict = {}
 
-        def fake_post(url, json, timeout):
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+
+        async def fake_post(url, json=None, **kwargs):
             captured["options"] = json["options"]
             return _ollama_response()
 
-        with patch("inference.fim.httpx.post", side_effect=fake_post):
-            complete(_request(), store)
+        client.post = fake_post
+
+        with patch("inference.fim.httpx.AsyncClient", return_value=client):
+            await complete(_request(), store)
 
         assert captured["options"]["temperature"] == 0.1
 
-    def test_ollama_called_with_stop_tokens(self):
+    async def test_ollama_called_with_stop_tokens(self):
         store = _store()
-        captured = {}
+        captured: dict = {}
 
-        def fake_post(url, json, timeout):
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+
+        async def fake_post(url, json=None, **kwargs):
             captured["options"] = json["options"]
             return _ollama_response()
 
-        with patch("inference.fim.httpx.post", side_effect=fake_post):
-            complete(_request(), store)
+        client.post = fake_post
+
+        with patch("inference.fim.httpx.AsyncClient", return_value=client):
+            await complete(_request(), store)
 
         stops = captured["options"]["stop"]
         assert FIM_PREFIX_TOKEN in stops
         assert FIM_SUFFIX_TOKEN in stops
-        assert "\n\n" in stops
+        assert "\n" in stops
 
-    def test_http_error_propagates(self):
+    async def test_http_error_propagates(self):
         store = _store()
         error_resp = MagicMock()
         error_resp.raise_for_status.side_effect = Exception("HTTP 500")
+        error_resp.json.return_value = {"response": ""}
 
-        with patch("inference.fim.httpx.post", return_value=error_resp):
+        with patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(error_resp)):
             with pytest.raises(Exception, match="HTTP 500"):
-                complete(_request(), store)
+                await complete(_request(), store)
+
+    async def test_rag_disabled_by_default_skips_store_query(self):
+        store = _store(results=["def helper(): return 1"])
+        with patch(
+            "inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))
+        ):
+            result = await complete(_request(), store)
+        store.query.assert_not_called()
+        assert result == "x = 1"

@@ -72,13 +72,13 @@ describe('DhiClient', () => {
   describe('index()', () => {
     it('sends POST /index and returns indexed count', async () => {
       mockFetch({ ok: true, json: () => ({ indexed: 4 }) });
-      const result = await client.index({ file_path: '/repo/module.py' });
+      const result = await client.index({ file_path: '/repo/module.py', content: 'def f(): pass', language: 'python' });
       assert.strictEqual(result.indexed, 4);
     });
 
     it('throws on 404 response', async () => {
       mockFetch({ ok: false, status: 404, text: 'not found' });
-      await assert.rejects(client.index({ file_path: '/missing.py' }), /404/);
+      await assert.rejects(client.index({ file_path: '/missing.py', content: '', language: 'python' }), /404/);
     });
   });
 });

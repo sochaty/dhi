@@ -25,7 +25,7 @@ def _embed(texts: list[str]) -> list[list[float]]:
     resp = httpx.post(
         f"http://{OLLAMA_HOST}:11434/api/embed",
         json={"model": EMBED_MODEL, "input": texts},
-        timeout=30,
+        timeout=60,
     )
     resp.raise_for_status()
     return resp.json()["embeddings"]
