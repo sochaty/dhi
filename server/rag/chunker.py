@@ -200,9 +200,7 @@ def _parse_and_walk(
 
     def walk(node) -> Generator[Chunk, None, None]:
         if node.type in target_types:
-            text = source_bytes[node.start_byte : node.end_byte].decode(
-                "utf-8", errors="replace"
-            )
+            text = source_bytes[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
             yield Chunk(
                 text=text,
                 file_path=file_path,

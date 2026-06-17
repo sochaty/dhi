@@ -136,9 +136,7 @@ def index_dir_endpoint(req: IndexDirRequest) -> IndexDirResponse:
     try:
         total_files = 0
         total_chunks = 0
-        for file_path in iter_source_files(
-            req.dir_path, respect_gitignore=req.respect_gitignore
-        ):
+        for file_path in iter_source_files(req.dir_path, respect_gitignore=req.respect_gitignore):
             try:
                 chunks = list(chunk_file(file_path))
                 if chunks:

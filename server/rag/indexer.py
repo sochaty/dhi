@@ -30,11 +30,11 @@ _SKIP_DIRS: frozenset[str] = frozenset(
         "env",
         "dist",
         "build",
-        "target",   # Rust / Maven / Gradle output
+        "target",  # Rust / Maven / Gradle output
         ".next",
         ".nuxt",
         "out",
-        "vendor",   # Go vendor directory
+        "vendor",  # Go vendor directory
         ".cache",
         "coverage",
         ".pytest_cache",
@@ -64,11 +64,7 @@ def iter_source_files(
 
     for dirpath, dirnames, filenames in os.walk(root_path, topdown=True):
         # Prune dirnames in-place — controls os.walk's recursion.
-        dirnames[:] = [
-            d
-            for d in dirnames
-            if d not in _SKIP_DIRS and not d.startswith(".")
-        ]
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
 
         for filename in filenames:
             abs_path = Path(dirpath) / filename
