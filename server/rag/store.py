@@ -110,7 +110,7 @@ class ChunkStore:
         if self._col.count() == 0:
             return
         result = self._col.get(include=["documents", "metadatas"])
-        for cid, doc in zip(result["ids"], result["documents"] or []):
+        for cid, doc in zip(result["ids"], result["documents"] or [], strict=False):
             if doc:
                 self._bm25_corpus[cid] = doc
         self._rebuild_bm25()
@@ -155,7 +155,7 @@ class ChunkStore:
             metadatas=metadatas,
         )
         # Sync BM25 corpus — update entries in place so rebuilds are minimal.
-        for cid, text in zip(ids, texts):
+        for cid, text in zip(ids, texts, strict=False):
             self._bm25_corpus[cid] = text
         self._rebuild_bm25()
 
@@ -182,7 +182,7 @@ class ChunkStore:
         scores = self._bm25.get_scores(_tokenize(text))
         # Pair each corpus entry with its score, sort descending, take top-N.
         ranked = sorted(
-            zip(self._bm25_ids, scores),
+            zip(self._bm25_ids, scores, strict=False),
             key=lambda x: x[1],
             reverse=True,
         )

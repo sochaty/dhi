@@ -7,8 +7,6 @@ in requirements.txt), so .gitignore filtering is tested end-to-end.
 
 from pathlib import Path
 
-import pytest
-
 from rag.indexer import count_source_files, iter_source_files
 
 # ── helpers ────────────────────────────────────────────────────────────────────

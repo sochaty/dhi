@@ -12,7 +12,6 @@ Endpoints tested:
   POST /search
 """
 
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 # api_client, fake_store are injected by pytest from conftest.py
