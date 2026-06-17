@@ -19,6 +19,10 @@ Dhi gives you FIM autocomplete, in-editor chat, and multi-file agent editing —
 | FIM ghost-text autocomplete (Python, TS, JS, Go, Rust, Java) | ✅ Post 1 |
 | RAG-based context retrieval (Chroma + nomic-embed-text) | ✅ Post 1 |
 | Workspace indexing via `Dhi: Index Workspace` command | ✅ Post 1 |
+| Multi-language Tree-sitter chunking (Go, Rust, Java, JS) | ✅ Post 2 |
+| BM25 hybrid search with Reciprocal Rank Fusion | ✅ Post 2 |
+| `/index-dir` — index entire workspace in one request | ✅ Post 2 |
+| `/search` — explicit hybrid/vector/BM25 search endpoint | ✅ Post 2 |
 | In-editor chat panel | 🚧 Post 3 |
 | Multi-file agent editing | 🚧 Post 4 |
 | Shared GPU inference pool | 🚧 Post 11 |
@@ -279,6 +283,7 @@ Each post ships a tagged commit — `git checkout post-N` to reproduce the codeb
 |---|---|---|
 | 0 | [Architecture overview](https://sourishchakraborty.com/open-source-ai-coding-ide-architecture) | — |
 | **1** | **[FIM autocomplete engine (Tree-sitter + StarCoder2)](https://sourishchakraborty.com/dhi-fim-autocomplete-engine)** | `post-1` |
+| **2** | **[Repository intelligence (multi-language + BM25 hybrid search)](https://sourishchakraborty.com/dhi-repository-intelligence)** | `post-2` |
 
 Blog: [blogs.sourishchakraborty.com](https://blogs.sourishchakraborty.com)
 

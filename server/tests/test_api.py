@@ -8,6 +8,8 @@ Endpoints tested:
   GET  /health
   POST /complete
   POST /index
+  POST /index-dir
+  POST /search
 """
 
 from unittest.mock import AsyncMock, patch
@@ -135,4 +137,112 @@ class TestIndexEndpoint:
     def test_store_error_returns_500(self, api_client, fake_store):
         with patch.object(fake_store, "upsert", side_effect=Exception("db error")):
             resp = api_client.post("/index", json=_INDEX_PAYLOAD)
+        assert resp.status_code == 500
+
+
+# ── POST /index-dir ────────────────────────────────────────────────────────────
+
+
+class TestIndexDirEndpoint:
+    def test_returns_200_with_counts(self, api_client, tmp_path):
+        (tmp_path / "main.py").write_text("def hello(): pass\n")
+        resp = api_client.post(
+            "/index-dir",
+            json={"dir_path": str(tmp_path), "respect_gitignore": False},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "indexed_files" in data
+        assert "indexed_chunks" in data
+        assert data["indexed_files"] >= 1
+
+    def test_missing_dir_path_returns_422(self, api_client):
+        resp = api_client.post("/index-dir", json={})
+        assert resp.status_code == 422
+
+    def test_empty_dir_returns_zero_counts(self, api_client, tmp_path):
+        resp = api_client.post(
+            "/index-dir",
+            json={"dir_path": str(tmp_path), "respect_gitignore": False},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["indexed_files"] == 0
+        assert data["indexed_chunks"] == 0
+
+    def test_nonexistent_dir_returns_500(self, api_client):
+        resp = api_client.post(
+            "/index-dir",
+            json={"dir_path": "/does/not/exist/xyzzy", "respect_gitignore": False},
+        )
+        assert resp.status_code == 500
+
+    def test_indexes_multiple_files(self, api_client, tmp_path):
+        (tmp_path / "a.py").write_text("def foo(): pass\n")
+        (tmp_path / "b.py").write_text("def bar(): pass\n")
+        resp = api_client.post(
+            "/index-dir",
+            json={"dir_path": str(tmp_path), "respect_gitignore": False},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["indexed_files"] == 2
+
+    def test_respect_gitignore_default_is_true(self, api_client, tmp_path):
+        (tmp_path / ".gitignore").write_text("*.py\n")
+        (tmp_path / "app.py").write_text("def foo(): pass\n")
+        resp = api_client.post("/index-dir", json={"dir_path": str(tmp_path)})
+        assert resp.status_code == 200
+        assert resp.json()["indexed_files"] == 0
+
+
+# ── POST /search ───────────────────────────────────────────────────────────────
+
+
+class TestSearchEndpoint:
+    def test_returns_200_with_results_field(self, api_client):
+        resp = api_client.post("/search", json={"query": "def greet"})
+        assert resp.status_code == 200
+        assert "results" in resp.json()
+
+    def test_results_is_a_list(self, api_client):
+        resp = api_client.post("/search", json={"query": "anything"})
+        assert isinstance(resp.json()["results"], list)
+
+    def test_missing_query_returns_422(self, api_client):
+        resp = api_client.post("/search", json={})
+        assert resp.status_code == 422
+
+    def test_mode_hybrid_is_default(self, api_client, fake_store):
+        with patch.object(fake_store, "hybrid_query", return_value=["chunk1"]) as mock_hq:
+            resp = api_client.post("/search", json={"query": "greet"})
+        assert resp.status_code == 200
+        mock_hq.assert_called_once()
+
+    def test_mode_bm25_calls_bm25_query(self, api_client, fake_store):
+        with patch.object(fake_store, "bm25_query", return_value=["lex_chunk"]) as mock_bm:
+            resp = api_client.post("/search", json={"query": "greet", "mode": "bm25"})
+        assert resp.status_code == 200
+        mock_bm.assert_called_once()
+
+    def test_mode_vector_calls_query(self, api_client, fake_store):
+        with patch.object(fake_store, "query", return_value=["vec_chunk"]) as mock_q:
+            resp = api_client.post("/search", json={"query": "greet", "mode": "vector"})
+        assert resp.status_code == 200
+        mock_q.assert_called_once()
+
+    def test_n_results_capped_at_20(self, api_client, fake_store):
+        with patch.object(fake_store, "hybrid_query", return_value=[]) as mock_hq:
+            api_client.post("/search", json={"query": "x", "n_results": 9999})
+        args, _ = mock_hq.call_args
+        assert args[1] <= 20  # second positional arg is n
+
+    def test_n_results_minimum_is_1(self, api_client, fake_store):
+        with patch.object(fake_store, "hybrid_query", return_value=[]) as mock_hq:
+            api_client.post("/search", json={"query": "x", "n_results": 0})
+        args, _ = mock_hq.call_args
+        assert args[1] >= 1  # second positional arg is n
+
+    def test_store_error_returns_500(self, api_client, fake_store):
+        with patch.object(fake_store, "hybrid_query", side_effect=Exception("index error")):
+            resp = api_client.post("/search", json={"query": "greet"})
         assert resp.status_code == 500

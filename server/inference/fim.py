@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -109,7 +110,7 @@ def build_fim_prompt(request: FIMRequest, context_chunks: list[str]) -> str:
     )
 
 
-async def complete(request: FIMRequest, store) -> str:
+async def complete(request: FIMRequest, store: Any) -> str:
     """Run a FIM completion via Ollama and return the generated text.
 
     ``store`` is typed as Any to avoid a circular import; it must expose a
@@ -122,7 +123,7 @@ async def complete(request: FIMRequest, store) -> str:
     for the next request instead of holding it for 5–7 seconds.
     """
     query_text = request.prefix[-QUERY_WINDOW:].strip() or request.file_path
-    context_chunks: list[str] = store.query(query_text, n_results=3) if FIM_USE_RAG else []
+    context_chunks: list[str] = store.hybrid_query(query_text, n_results=3) if FIM_USE_RAG else []
 
     prompt = build_fim_prompt(request, context_chunks)
 
@@ -155,4 +156,4 @@ async def complete(request: FIMRequest, store) -> str:
         data.get("response", ""),
         prompt[-120:],
     )
-    return data["response"]
+    return str(data["response"])

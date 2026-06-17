@@ -39,6 +39,12 @@ class FakeChunkStore:
     def query(self, text: str, n_results: int = 3) -> list[str]:
         return self._query_results[:n_results]
 
+    def bm25_query(self, text: str, n_results: int = 5) -> list[str]:
+        return self._query_results[:n_results]
+
+    def hybrid_query(self, text: str, n_results: int = 5) -> list[str]:
+        return self._query_results[:n_results]
+
     def count(self) -> int:
         return len(self._docs)
 
