@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 from rag.chunker import detect_language
 
@@ -86,7 +87,7 @@ def count_source_files(root: str, *, respect_gitignore: bool = True) -> int:
 # ── .gitignore loader ─────────────────────────────────────────────────────────
 
 
-def _load_gitignore(root: Path) -> object | None:
+def _load_gitignore(root: Path) -> Any:
     """Return a pathspec matcher for root/.gitignore, or None.
 
     Returns None when pathspec is not installed (optional dependency) or when
@@ -96,7 +97,7 @@ def _load_gitignore(root: Path) -> object | None:
     if not gi_file.is_file():
         return None
     try:
-        import pathspec  # type: ignore[import-not-found]
+        import pathspec
 
         with gi_file.open() as fh:
             return pathspec.PathSpec.from_lines("gitwildmatch", fh)

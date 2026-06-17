@@ -43,7 +43,7 @@ def _embed(texts: list[str]) -> list[list[float]]:
         timeout=60,
     )
     resp.raise_for_status()
-    return resp.json()["embeddings"]
+    return resp.json()["embeddings"]  # type: ignore[no-any-return]
 
 
 # ── Chunk identity ─────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ class ChunkStore:
             self._bm25 = None
             return
         try:
-            from rank_bm25 import BM25Okapi  # optional dep
+            from rank_bm25 import BM25Okapi  # type: ignore[import-untyped]
         except ImportError:
             self._bm25 = None
             return

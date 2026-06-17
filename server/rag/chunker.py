@@ -18,7 +18,7 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 
-from tree_sitter import Language, Parser
+from tree_sitter import Language, Node, Parser
 
 # ── File-extension → language name ────────────────────────────────────────────
 
@@ -103,29 +103,29 @@ def _load_grammar(name: str) -> Language | None:
     """
     try:
         if name == "python":
-            import tree_sitter_python as m  # type: ignore[import-not-found]
+            import tree_sitter_python  # type: ignore[import-untyped]
 
-            return Language(m.language())
+            return Language(tree_sitter_python.language())
         if name == "typescript":
-            import tree_sitter_typescript as m  # type: ignore[import-not-found]
+            import tree_sitter_typescript  # type: ignore[import-untyped]
 
-            return Language(m.language_typescript())
+            return Language(tree_sitter_typescript.language_typescript())  # type: ignore[attr-defined]
         if name == "javascript":
-            import tree_sitter_javascript as m  # type: ignore[import-not-found]
+            import tree_sitter_javascript  # type: ignore[import-untyped]
 
-            return Language(m.language())
+            return Language(tree_sitter_javascript.language())
         if name == "go":
-            import tree_sitter_go as m  # type: ignore[import-not-found]
+            import tree_sitter_go  # type: ignore[import-untyped]
 
-            return Language(m.language())
+            return Language(tree_sitter_go.language())
         if name == "rust":
-            import tree_sitter_rust as m  # type: ignore[import-not-found]
+            import tree_sitter_rust
 
-            return Language(m.language())
+            return Language(tree_sitter_rust.language())
         if name == "java":
-            import tree_sitter_java as m  # type: ignore[import-not-found]
+            import tree_sitter_java
 
-            return Language(m.language())
+            return Language(tree_sitter_java.language())
     except (ImportError, AttributeError):
         return None
     return None
@@ -198,7 +198,7 @@ def _parse_and_walk(
     tree = parser.parse(source_bytes)
     target_types = CHUNK_NODE_TYPES[language]
 
-    def walk(node) -> Generator[Chunk, None, None]:
+    def walk(node: Node) -> Generator[Chunk, None, None]:
         if node.type in target_types:
             text = source_bytes[node.start_byte : node.end_byte].decode("utf-8", errors="replace")
             yield Chunk(
