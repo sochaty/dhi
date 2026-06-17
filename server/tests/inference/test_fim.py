@@ -47,6 +47,7 @@ def _ollama_response(text: str = "    x = 1") -> MagicMock:
 def _store(results: list[str] | None = None) -> MagicMock:
     m = MagicMock()
     m.query.return_value = results or []
+    m.hybrid_query.return_value = results or []
     return m
 
 
@@ -164,8 +165,8 @@ class TestComplete:
             patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
         ):
             await complete(req, store)
-        store.query.assert_called_once()
-        query_arg = store.query.call_args[0][0]
+        store.hybrid_query.assert_called_once()
+        query_arg = store.hybrid_query.call_args[0][0]
         assert query_arg == prefix[-200:].strip()
 
     async def test_uses_file_path_as_fallback_query_when_prefix_empty(self):
@@ -176,7 +177,7 @@ class TestComplete:
             patch("inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response())),
         ):
             await complete(req, store)
-        query_arg = store.query.call_args[0][0]
+        query_arg = store.hybrid_query.call_args[0][0]
         assert query_arg == "/repo/utils.py"
 
     async def test_context_from_store_injected_into_prompt(self):
@@ -266,5 +267,5 @@ class TestComplete:
             "inference.fim.httpx.AsyncClient", return_value=_mock_client(_ollama_response("x = 1"))
         ):
             result = await complete(_request(), store)
-        store.query.assert_not_called()
+        store.hybrid_query.assert_not_called()
         assert result == "x = 1"

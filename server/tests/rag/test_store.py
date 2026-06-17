@@ -50,6 +50,16 @@ def _make_store(chroma_mock: MagicMock) -> ChunkStore:
     return store
 
 
+def _new_store(col: MagicMock) -> ChunkStore:
+    """Bypass __init__ and return a ChunkStore with all fields initialised."""
+    store = ChunkStore.__new__(ChunkStore)
+    store._col = col
+    store._bm25_corpus = {}
+    store._bm25 = None
+    store._bm25_ids = []
+    return store
+
+
 # ── chunk_id ───────────────────────────────────────────────────────────────────
 
 
@@ -82,8 +92,7 @@ class TestChunkId:
 class TestChunkStoreUpsert:
     def test_upsert_calls_embed_then_chroma(self):
         col = MagicMock()
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         chunk = _make_chunk()
         with patch(
@@ -96,8 +105,7 @@ class TestChunkStoreUpsert:
 
     def test_upsert_empty_list_is_noop(self):
         col = MagicMock()
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         with patch("rag.store.httpx.post") as mock_post:
             store.upsert([])
@@ -107,8 +115,7 @@ class TestChunkStoreUpsert:
 
     def test_upsert_passes_correct_ids(self):
         col = MagicMock()
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         chunks = [_make_chunk(start_line=i, end_line=i) for i in range(1, 4)]
         expected_ids = [chunk_id(c) for c in chunks]
@@ -123,8 +130,7 @@ class TestChunkStoreUpsert:
 
     def test_upsert_passes_correct_metadata(self):
         col = MagicMock()
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         chunk = _make_chunk(file_path="/repo/x.py", start_line=3, end_line=7, language="python")
         with patch("rag.store.httpx.post", return_value=_fake_embed_response([chunk.text])):
@@ -141,8 +147,7 @@ class TestChunkStoreUpsert:
         """Upserting the same chunk twice should call Chroma upsert twice
         (Chroma deduplicates by ID internally), but the IDs must be identical."""
         col = MagicMock()
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         chunk = _make_chunk()
         with patch("rag.store.httpx.post", return_value=_fake_embed_response([chunk.text])):
@@ -163,8 +168,7 @@ class TestChunkStoreQuery:
         col = MagicMock()
         col.count.return_value = 5
         col.query.return_value = {"documents": [["chunk A", "chunk B"]]}
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         with patch("rag.store.httpx.post", return_value=_fake_embed_response(["query"])):
             results = store.query("some query", n_results=2)
@@ -174,8 +178,7 @@ class TestChunkStoreQuery:
     def test_query_empty_store_returns_empty_list(self):
         col = MagicMock()
         col.count.return_value = 0
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         with patch("rag.store.httpx.post") as mock_post:
             results = store.query("anything")
@@ -187,14 +190,166 @@ class TestChunkStoreQuery:
         col = MagicMock()
         col.count.return_value = 2
         col.query.return_value = {"documents": [["a", "b"]]}
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         with patch("rag.store.httpx.post", return_value=_fake_embed_response(["q"])):
             store.query("q", n_results=10)
 
         _, kwargs = col.query.call_args
         assert kwargs["n_results"] == 2  # capped to collection size
+
+
+# ── _rrf_merge ────────────────────────────────────────────────────────────────
+
+
+class TestRrfMerge:
+    def test_top_doc_in_both_lists_wins(self):
+        from rag.store import _rrf_merge
+
+        vector = ["A", "B", "C"]
+        bm25 = ["A", "D", "E"]
+        result = _rrf_merge(vector, bm25, n=3)
+        assert result[0] == "A"
+
+    def test_returns_at_most_n(self):
+        from rag.store import _rrf_merge
+
+        vector = ["A", "B", "C", "D"]
+        bm25 = ["D", "C", "B", "A"]
+        result = _rrf_merge(vector, bm25, n=2)
+        assert len(result) == 2
+
+    def test_union_of_both_lists(self):
+        from rag.store import _rrf_merge
+
+        result = _rrf_merge(["A"], ["B"], n=5)
+        assert set(result) == {"A", "B"}
+
+    def test_empty_lists_return_empty(self):
+        from rag.store import _rrf_merge
+
+        assert _rrf_merge([], [], n=5) == []
+
+    def test_one_empty_list_returns_other(self):
+        from rag.store import _rrf_merge
+
+        result = _rrf_merge(["A", "B"], [], n=5)
+        assert result == ["A", "B"]
+
+
+# ── ChunkStore.bm25_query ──────────────────────────────────────────────────────
+
+
+class TestChunkStoreBm25Query:
+    def _store_with_corpus(self, docs: dict[str, str]) -> "ChunkStore":
+        """Build a ChunkStore bypassing __init__ with a seeded BM25 corpus."""
+        store = ChunkStore.__new__(ChunkStore)
+        store._col = MagicMock()
+        store._bm25_corpus = dict(docs)
+        store._bm25 = None
+        store._bm25_ids = []
+        store._rebuild_bm25()
+        return store
+
+    def test_returns_empty_when_no_corpus(self):
+        col = MagicMock()
+        store = _new_store(col)
+        assert store.bm25_query("foo") == []
+
+    def test_returns_matching_doc(self):
+        # Need >=3 docs so IDF is non-zero for terms appearing in <50% of corpus.
+        store = self._store_with_corpus(
+            {
+                "id1": "greet hello world function",
+                "id2": "add subtract multiply divide",
+                "id3": "loop iterate repeat cycle",
+            }
+        )
+        results = store.bm25_query("greet hello", n_results=1)
+        assert len(results) == 1
+        assert "greet" in results[0]
+
+    def test_zero_score_docs_excluded(self):
+        store = self._store_with_corpus(
+            {"id1": "import os path", "id2": "import sys argv", "id3": "import json loads"}
+        )
+        results = store.bm25_query("completely unrelated query xyz987")
+        assert results == []
+
+    def test_respects_n_results(self):
+        corpus = {f"id{i}": f"unique_{i} def func return value {i}" for i in range(10)}
+        store = self._store_with_corpus(corpus)
+        results = store.bm25_query("unique_0", n_results=3)
+        assert len(results) <= 3
+
+    def test_upsert_syncs_bm25_corpus(self):
+        col = MagicMock()
+        store = _new_store(col)
+
+        chunk = _make_chunk(text="def helper(): return 42")
+        with patch("rag.store.httpx.post", return_value=_fake_embed_response([chunk.text])):
+            store.upsert([chunk])
+
+        assert len(store._bm25_corpus) == 1
+        assert store._bm25 is not None
+
+    def test_delete_file_removes_from_corpus(self):
+        col = MagicMock()
+        col.get.return_value = {"ids": ["id1"]}
+        store = _new_store(col)
+        store._bm25_corpus = {"id1": "def foo(): pass", "id2": "def bar(): pass"}
+        store._rebuild_bm25()
+
+        store.delete_file("/repo/foo.py")
+
+        assert "id1" not in store._bm25_corpus
+        assert "id2" in store._bm25_corpus
+
+
+# ── ChunkStore.hybrid_query ────────────────────────────────────────────────────
+
+
+class TestChunkStoreHybridQuery:
+    def test_falls_back_to_vector_when_bm25_empty(self):
+        col = MagicMock()
+        col.count.return_value = 2
+        col.query.return_value = {"documents": [["vec_chunk_1", "vec_chunk_2"]]}
+        store = _new_store(col)
+
+        with patch("rag.store.httpx.post", return_value=_fake_embed_response(["q"])):
+            results = store.hybrid_query("q", n_results=2)
+
+        assert results == ["vec_chunk_1", "vec_chunk_2"]
+
+    def test_merges_vector_and_bm25(self):
+        col = MagicMock()
+        col.count.return_value = 1
+        col.query.return_value = {"documents": [["def greet(): pass"]]}
+        store = _new_store(col)
+        store._bm25_corpus = {
+            "id_a": "def greet(): pass",
+            "id_b": "def add(a, b): return a + b",
+        }
+        store._rebuild_bm25()
+
+        with patch("rag.store.httpx.post", return_value=_fake_embed_response(["q"])):
+            results = store.hybrid_query("greet", n_results=5)
+
+        assert isinstance(results, list)
+        assert len(results) >= 1
+
+    def test_respects_n_results(self):
+        col = MagicMock()
+        col.count.return_value = 3
+        col.query.return_value = {"documents": [["a", "b", "c", "d", "e", "f"]]}
+        store = _new_store(col)
+        store._bm25_corpus = {f"id{i}": f"doc {i}" for i in range(6)}
+        store._rebuild_bm25()
+
+        with patch("rag.store.httpx.post", return_value=_fake_embed_response(["q"])):
+            results = store.hybrid_query("doc", n_results=2)
+
+        assert len(results) <= 2
 
 
 # ── ChunkStore.delete_file ─────────────────────────────────────────────────────
@@ -204,8 +359,7 @@ class TestChunkStoreDeleteFile:
     def test_delete_file_removes_matching_docs(self):
         col = MagicMock()
         col.get.return_value = {"ids": ["id1", "id2"]}
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         store.delete_file("/repo/foo.py")
 
@@ -215,8 +369,7 @@ class TestChunkStoreDeleteFile:
     def test_delete_file_no_match_skips_delete(self):
         col = MagicMock()
         col.get.return_value = {"ids": []}
-        store = ChunkStore.__new__(ChunkStore)
-        store._col = col
+        store = _new_store(col)
 
         store.delete_file("/repo/not_there.py")
 
