@@ -49,6 +49,11 @@
           "type": "number",
           "default": 64,
           "description": "Maximum number of tokens per completion."
+        },
+        "dhi.chatModel": {
+          "type": "string",
+          "default": "llama3.2:3b",
+          "description": "Ollama model tag used for chat responses (separate from the FIM model)."
         }
       }
     }

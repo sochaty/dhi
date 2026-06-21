@@ -7,7 +7,8 @@ services:
       - CHROMA_HOST=chroma
       - OLLAMA_HOST=ollama
       - FIM_MODEL=${FIM_MODEL:-starcoder2:3b}
-      - EMBED_MODEL=${EMBED_MODEL:-starcoder2:3b}
+      - EMBED_MODEL=${EMBED_MODEL:-nomic-embed-text}
+      - CHAT_MODEL=${CHAT_MODEL:-llama3.2:3b}
       - FIM_MODEL_MAX_TOKENS=${FIM_MODEL_MAX_TOKENS:-20}
       - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
     depends_on:
@@ -39,6 +40,8 @@ services:
         ollama pull ${FIM_MODEL:-starcoder2:3b} &&
         echo 'Pulling embed model...' &&
         ollama pull ${EMBED_MODEL:-nomic-embed-text} &&
+        echo 'Pulling chat model...' &&
+        ollama pull ${CHAT_MODEL:-llama3.2:3b} &&
         echo 'Models ready.' &&
         wait
       "

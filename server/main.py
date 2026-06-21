@@ -1,8 +1,11 @@
 import asyncio
+import json
 import logging
+from collections.abc import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from starlette.requests import Request
 
@@ -10,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
+from chat import ChatMessage, ChatRequest as ChatReq, stream_chat  # noqa: E402, I001
 from inference.fim import FIMRequest, complete  # noqa: E402
 from rag.chunker import chunk_file, chunk_text  # noqa: E402
 from rag.indexer import iter_source_files  # noqa: E402
@@ -65,6 +69,19 @@ class SearchRequest(BaseModel):
 
 class SearchResponse(BaseModel):
     results: list[str]
+
+
+class ChatMessageModel(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequestModel(BaseModel):
+    message: str
+    file_path: str = ""
+    language: str = ""
+    file_content: str = ""
+    history: list[ChatMessageModel] = []
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -148,6 +165,38 @@ def index_dir_endpoint(req: IndexDirRequest) -> IndexDirResponse:
         return IndexDirResponse(indexed_files=total_files, indexed_chunks=total_chunks)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/chat")
+async def chat_endpoint(req: ChatRequestModel) -> StreamingResponse:
+    """Stream a chat response as Server-Sent Events.
+
+    Each event: ``data: {"token": "..."}\\n\\n``
+    Final event: ``data: [DONE]\\n\\n``
+    """
+    chat_req = ChatReq(
+        message=req.message,
+        file_path=req.file_path,
+        language=req.language,
+        file_content=req.file_content,
+        history=[ChatMessage(role=m.role, content=m.content) for m in req.history],
+    )
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            async for token in stream_chat(chat_req, store):
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except Exception as exc:
+            logging.exception("chat_endpoint error")
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 @app.post("/search", response_model=SearchResponse)
