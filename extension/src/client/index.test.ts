@@ -81,4 +81,68 @@ describe('DhiClient', () => {
       await assert.rejects(client.index({ file_path: '/missing.py', content: '', language: 'python' }), /404/);
     });
   });
+
+  describe('chat()', () => {
+    function mockStream(lines: string[]): sinon.SinonStub {
+      const encoder = new TextEncoder();
+      const chunks = lines.map(l => encoder.encode(l));
+      let i = 0;
+      const reader = {
+        read: async () => i < chunks.length
+          ? { done: false, value: chunks[i++] }
+          : { done: true, value: undefined },
+        releaseLock: () => {},
+      };
+      return sinon.stub(global, 'fetch').resolves({
+        ok: true,
+        status: 200,
+        body: { getReader: () => reader },
+      } as unknown as Response);
+    }
+
+    it('yields tokens from SSE stream', async () => {
+      mockStream([
+        'data: {"token": "Hello"}\n\n',
+        'data: {"token": " world"}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+      const tokens: string[] = [];
+      for await (const t of client.chat({ message: 'hi' })) {
+        tokens.push(t);
+      }
+      assert.deepStrictEqual(tokens, ['Hello', ' world']);
+    });
+
+    it('stops iteration on [DONE] sentinel', async () => {
+      mockStream([
+        'data: {"token": "A"}\n\ndata: [DONE]\n\ndata: {"token": "B"}\n\n',
+      ]);
+      const tokens: string[] = [];
+      for await (const t of client.chat({ message: 'hi' })) {
+        tokens.push(t);
+      }
+      assert.deepStrictEqual(tokens, ['A']);
+    });
+
+    it('throws when server returns non-ok response', async () => {
+      sinon.stub(global, 'fetch').resolves({
+        ok: false,
+        status: 503,
+        body: null,
+        text: async () => 'busy',
+      } as unknown as Response);
+      await assert.rejects(async () => {
+        for await (const _ of client.chat({ message: 'hi' })) { /* drain */ }
+      }, /503/);
+    });
+
+    it('sends POST /chat with correct body', async () => {
+      const stub = mockStream(['data: [DONE]\n\n']);
+      for await (const _ of client.chat({ message: 'explain', file_path: '/a.py' })) { /* drain */ }
+      const init = stub.firstCall.args[1] as RequestInit;
+      const body = JSON.parse(init.body as string) as { message: string; file_path: string };
+      assert.strictEqual(body.message, 'explain');
+      assert.strictEqual(body.file_path, '/a.py');
+    });
+  });
 });

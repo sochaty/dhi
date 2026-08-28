@@ -21,6 +21,7 @@ The project uses three interlocking patterns applied consistently across the ser
 ├──────────────────────────────────────────────┤
 │  Service Layer                               │
 │   server/inference/fim.py   FIM completion  │
+│   server/chat.py            Chat streaming  │
 │   server/agents/graph.py    LangGraph loop  │
 │  Owns: business logic, prompt assembly       │
 │  Does NOT: know about HTTP or Chroma         │
@@ -64,7 +65,8 @@ The FastAPI app instantiates `ChunkStore()` once at startup and passes it throug
 | Layer | May NOT import |
 |---|---|
 | `main.py` (API) | `chromadb`, `httpx` (inference), `tree_sitter` |
-| `inference/` | `chromadb`, `fastapi` |
+| `inference/` | `chromadb`, `fastapi`, `chat` |
+| `chat.py` | `chromadb`, `fastapi`, `inference/` |
 | `rag/` | `fastapi`, `agents/`, `sandbox/` |
 | `platform/` | `rag/`, `inference/` |
 
@@ -118,8 +120,9 @@ async function provideInlineCompletionItems(...) {
 |---|---|---|---|
 | `chunker.py` | Pure unit | Nothing | — |
 | `store.py` | Unit | `httpx.post` (embed), `chromadb.HttpClient` | Chunk shape |
-| `fim.py` | Unit | `store.query()`, `httpx.post` (Ollama) | Prompt assembly logic |
-| `main.py` | Integration | `ChunkStore`, `complete()` | FastAPI routing |
+| `fim.py` | Unit | `store.hybrid_query()`, `httpx.AsyncClient` (Ollama) | Prompt assembly logic |
+| `chat.py` | Unit | `store.hybrid_query()`, `httpx.AsyncClient` (Ollama) | Context assembly logic |
+| `main.py` | Integration | `ChunkStore`, `complete()`, `stream_chat()` | FastAPI routing |
 | `platform/` | Unit | `redis.Redis`, `stripe` | Auth/queue/meter logic |
 | Extension providers | Unit | `DhiClient` (sinon stub) | Provider logic |
 | Extension client | Unit | `global.fetch` (sinon) | HTTP construction |

@@ -10,6 +10,7 @@ Endpoints tested:
   POST /index
   POST /index-dir
   POST /search
+  POST /chat
 """
 
 from unittest.mock import AsyncMock, patch
@@ -246,3 +247,74 @@ class TestSearchEndpoint:
         with patch.object(fake_store, "hybrid_query", side_effect=Exception("index error")):
             resp = api_client.post("/search", json={"query": "greet"})
         assert resp.status_code == 500
+
+
+# ── POST /chat ─────────────────────────────────────────────────────────────────
+
+
+async def _fake_stream_tokens(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+    yield "Hello"
+    yield " world"
+
+
+async def _fake_stream_empty(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+    return
+    yield  # make it an async generator
+
+
+async def _fake_stream_error(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+    raise RuntimeError("ollama down")
+    yield  # make it an async generator
+
+
+class TestChatEndpoint:
+    def test_returns_200(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_tokens):
+            resp = api_client.post("/chat", json={"message": "hello"})
+        assert resp.status_code == 200
+
+    def test_response_is_event_stream(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_tokens):
+            resp = api_client.post("/chat", json={"message": "hello"})
+        assert "text/event-stream" in resp.headers["content-type"]
+
+    def test_tokens_emitted_as_sse_data(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_tokens):
+            resp = api_client.post("/chat", json={"message": "hello"})
+        assert 'data: {"token": "Hello"}' in resp.text
+        assert 'data: {"token": " world"}' in resp.text
+
+    def test_done_sentinel_is_last_event(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_tokens):
+            resp = api_client.post("/chat", json={"message": "hello"})
+        assert resp.text.endswith("data: [DONE]\n\n")
+
+    def test_empty_stream_sends_only_done(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_empty):
+            resp = api_client.post("/chat", json={"message": "hi"})
+        assert resp.text == "data: [DONE]\n\n"
+
+    def test_missing_message_returns_422(self, api_client):
+        resp = api_client.post("/chat", json={})
+        assert resp.status_code == 422
+
+    def test_stream_error_emits_error_event_then_done(self, api_client):
+        with patch("main.stream_chat", new=_fake_stream_error):
+            resp = api_client.post("/chat", json={"message": "hello"})
+        assert '"error"' in resp.text
+        assert resp.text.endswith("data: [DONE]\n\n")
+
+    def test_accepts_optional_fields(self, api_client):
+        payload = {
+            "message": "what does this do?",
+            "file_path": "/repo/app.py",
+            "language": "python",
+            "file_content": "def main(): pass",
+            "history": [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ],
+        }
+        with patch("main.stream_chat", new=_fake_stream_tokens):
+            resp = api_client.post("/chat", json=payload)
+        assert resp.status_code == 200

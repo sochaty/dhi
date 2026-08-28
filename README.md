@@ -2,9 +2,18 @@
 
 > *"Pure intelligence for your code. Open source."*
 
-[![CI](https://github.com/sochaty/dhi/actions/workflows/ci.yml/badge.svg)](https://github.com/sochaty/dhi/actions/workflows/ci.yml)
+[![CI](https://github.com/sochaty/dhi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sochaty/dhi/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/sochaty/dhi/graph/badge.svg)](https://codecov.io/gh/sochaty/dhi)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![GitHub release](https://img.shields.io/github/v/tag/sochaty/dhi?label=release)](https://github.com/sochaty/dhi/releases)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/sochaty.dhi?label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=sochaty.dhi)
+[![VS Code](https://img.shields.io/visual-studio-marketplace/v/sochaty.dhi?label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=sochaty.dhi)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/sochaty.dhi)](https://marketplace.visualstudio.com/items?itemName=sochaty.dhi)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/sochaty.dhi)](https://marketplace.visualstudio.com/items?itemName=sochaty.dhi)
+[![Stars](https://img.shields.io/github/stars/sochaty/dhi?style=social)](https://github.com/sochaty/dhi/stargazers)
+[![Forks](https://img.shields.io/github/forks/sochaty/dhi?style=social)](https://github.com/sochaty/dhi/network/members)
 
 **Tired of $20/month AI IDEs and per-token pricing?**
 
@@ -23,7 +32,8 @@ Dhi gives you FIM autocomplete, in-editor chat, and multi-file agent editing —
 | BM25 hybrid search with Reciprocal Rank Fusion | ✅ Post 2 |
 | `/index-dir` — index entire workspace in one request | ✅ Post 2 |
 | `/search` — explicit hybrid/vector/BM25 search endpoint | ✅ Post 2 |
-| In-editor chat panel | 🚧 Post 3 |
+| In-editor chat panel with streaming RAG context | ✅ Post 3 |
+| `/chat` — SSE streaming chat endpoint | ✅ Post 3 |
 | Multi-file agent editing | 🚧 Post 4 |
 | Shared GPU inference pool | 🚧 Post 11 |
 
@@ -150,6 +160,7 @@ All extension settings live under the `dhi.*` namespace in VS Code settings.
 | `dhi.serverUrl` | `http://localhost:8000` | FastAPI server URL |
 | `dhi.completionEnabled` | `true` | Toggle ghost-text completions on/off |
 | `dhi.completionDebounceMs` | `150` | Milliseconds to wait after last keystroke before fetching |
+| `dhi.chatModel` | `llama3.2:3b` | Ollama model used for chat responses (separate from FIM model) |
 
 All server tunables are set via environment variables (`.env` file or `docker compose` override):
 
@@ -161,6 +172,7 @@ All server tunables are set via environment variables (`.env` file or `docker co
 | `OLLAMA_TIMEOUT` | `120` | Seconds before Ollama request times out |
 | `MAX_PREFIX_CHARS` | `256` | Characters of file above cursor to include in prompt |
 | `MAX_SUFFIX_CHARS` | `128` | Characters of file below cursor to include in prompt |
+| `CHAT_MODEL` | `llama3.2:3b` | Ollama model tag for chat responses |
 
 ---
 
@@ -171,7 +183,7 @@ All server tunables are set via environment variables (`.env` file or `docker co
 │  VS Code Extension (TypeScript)                      │
 │  ┌──────────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │ FIM Provider │  │ Chat     │  │ Agent View   │  │
-│  │ async/await  │  │ (Post 3) │  │ (Post 4)     │  │
+│  │ async/await  │  │ panel.ts │  │ (Post 4)     │  │
 │  └──────┬───────┘  └────┬─────┘  └──────┬───────┘  │
 │         └───────────────┼───────────────┘           │
 │                    DhiClient (all HTTP here)         │
@@ -180,13 +192,13 @@ All server tunables are set via environment variables (`.env` file or `docker co
 ┌─────────────────────────▼───────────────────────────┐
 │  FastAPI Server (Python)                             │
 │  ┌──────────────┐  ┌──────────────┐                 │
-│  │ POST /complete│  │ POST /index  │                 │
-│  └──────┬───────┘  └──────┬───────┘                 │
-│  Service│                 │ Service                  │
-│  ┌──────▼───────┐  ┌──────▼───────┐                 │
-│  │ inference/   │  │ rag/         │                 │
-│  │ fim.py       │  │ chunker.py   │                 │
-│  └──────┬───────┘  │ store.py     │                 │
+│  │ POST /complete│  │ POST /index  │  POST /chat  │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬──────┘  │
+│  Service│                 │ Service          │ Service  │
+│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────▼──────┐  │
+│  │ inference/   │  │ rag/         │  │ chat.py     │  │
+│  │ fim.py       │  │ chunker.py   │  │ SSE stream  │  │
+│  └──────┬───────┘  │ store.py     │  └──────┬──────┘  │
 │         │          └──────┬───────┘                 │
 └─────────┼─────────────────┼──────────────────────── ┘
           │                 │
@@ -243,6 +255,12 @@ docker compose down -v
 docker compose up -d
 ```
 
+**Chat panel shows no response / hangs**
+
+1. Make sure `llama3.2:3b` (or your `CHAT_MODEL`) is pulled: `docker compose exec ollama ollama pull llama3.2:3b`
+2. Check that the `/chat` endpoint is reachable: `curl -N -X POST http://localhost:8000/chat -H "Content-Type: application/json" -d "{\"message\":\"hello\"}"`
+3. Each chat uses a separate model from FIM — both models must be pulled.
+
 **Extension not activating**
 
 Make sure you installed the VSIX and reloaded VS Code. Check `Extensions panel → Dhi` to confirm version `0.1.0` is listed and enabled.
@@ -284,6 +302,7 @@ Each post ships a tagged commit — `git checkout post-N` to reproduce the codeb
 | 0 | [Architecture overview](https://sourishchakraborty.com/open-source-ai-coding-ide-architecture) | — |
 | **1** | **[FIM autocomplete engine (Tree-sitter + StarCoder2)](https://sourishchakraborty.com/dhi-fim-autocomplete-engine)** | `post-1` |
 | **2** | **[Repository intelligence (multi-language + BM25 hybrid search)](https://sourishchakraborty.com/dhi-repository-intelligence)** | `post-2` |
+| 3 | Chat-in-editor with streaming RAG (coming soon) | `post-3` |
 
 Blog: [blogs.sourishchakraborty.com](https://blogs.sourishchakraborty.com)
 

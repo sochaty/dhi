@@ -103,8 +103,17 @@ jobs:
         run: |
           pip-audit -r requirements.txt \
             --ignore-vuln GHSA-f4j7-r4q5-qw2c \
+            --ignore-vuln GHSA-2wm9-hf6c-p5cr \
+            --ignore-vuln GHSA-36p7-vc44-83pf \
+            --ignore-vuln GHSA-xph7-9rjv-w5fr \
             --ignore-vuln PYSEC-2026-161
           # GHSA-f4j7-r4q5-qw2c: chromadb — no fix released upstream yet
+          # GHSA-2wm9-hf6c-p5cr, GHSA-36p7-vc44-83pf, GHSA-xph7-9rjv-w5fr: chromadb —
+          #   RBAC/multi-tenant authorization bypasses in chromadb's auth provider,
+          #   no fix released upstream yet. Not exploitable here: docker-compose runs
+          #   chroma with no auth provider configured at all (single local tenant,
+          #   dev-only network) — these CVEs assume auth is enabled. Re-evaluate once
+          #   chromadb ships a fix or this deployment adds multi-tenant auth.
           # PYSEC-2026-161: starlette — fix requires starlette>=1.0.1 which
           #   breaks FastAPI 0.x; re-evaluate when FastAPI ships starlette 1.x support
 

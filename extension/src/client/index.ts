@@ -35,6 +35,19 @@ export interface HealthResponse {
   status: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  file_path?: string;
+  language?: string;
+  file_content?: string;
+  history?: ChatMessage[];
+}
+
 export class DhiClient {
   constructor(
     private readonly getServerUrl: () => string = () => 'http://localhost:8000',
@@ -54,6 +67,45 @@ export class DhiClient {
 
   async index(req: IndexRequest): Promise<IndexResponse> {
     return this._post<IndexResponse>('/index', req);
+  }
+
+  async *chat(req: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
+    const resp = await fetch(`${this.baseUrl}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal,
+    });
+    if (!resp.ok || !resp.body) {
+      const text = await resp.text();
+      throw new Error(`Dhi server ${resp.status}: ${text}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (payload === '[DONE]') return;
+          try {
+            const parsed = JSON.parse(payload) as { token?: string; error?: string };
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.token) yield parsed.token;
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   private async _get<T>(path: string): Promise<T> {
