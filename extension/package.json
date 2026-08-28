@@ -12,7 +12,7 @@
   "categories": ["AI", "Programming Languages", "Other"],
   "keywords": ["AI", "autocomplete", "open source", "LLM", "StarCoder", "Qwen"],
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.125.0"
   },
   "activationEvents": ["onStartupFinished"],
   "main": "./out/extension.js",
